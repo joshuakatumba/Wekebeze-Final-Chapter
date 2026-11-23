@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { ArrowLeft, RotateCcw, Download, CheckCircle2, Info } from "lucide-react";
+import { Undo2, RotateCcw, Download, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "../../api/client";
 import { ENDPOINTS } from "../../api/endpoints";
@@ -194,23 +194,19 @@ export default function GuidedChatPage({ onNavigate }) {
           )}
         </div>
 
-        <div className="between" style={{ padding: "12px 16px", borderTop: "1px solid var(--border-subtle)", background: "var(--surface-card)", flexWrap: "wrap", gap: 8 }}>
+        <div className="between" style={{ padding: "10px 14px", borderTop: "1px solid var(--border-subtle)", background: "var(--surface-card)" }}>
           <div className="row" style={{ gap: 8 }}>
-            <Button variant="outline" size="sm" onClick={goBack} disabled={messages.length <= 1}>
-              <ArrowLeft size={14} /> {t("common.back")}
+            <Button variant="outline" size="sm" onClick={goBack} disabled={messages.length <= 1} aria-label="Undo" title="Undo">
+              <Undo2 size={14} />
             </Button>
-            <Button variant="outline" size="sm" onClick={restart}>
-              <RotateCcw size={14} /> {t("guided.restart")}
+            <Button variant="outline" size="sm" onClick={restart} aria-label="Restart" title="Restart">
+              <RotateCcw size={14} />
             </Button>
-            <Button variant="outline" size="sm" onClick={exportChat}>
-              <Download size={14} /> {t("guided.export")}
+            <Button variant="outline" size="sm" onClick={exportChat} aria-label="Export" title="Export">
+              <Download size={14} />
             </Button>
           </div>
-          <div className="row" style={{ gap: 6, fontSize: 11, color: "var(--color-pebble)" }}>
-            <Info size={13} />
-            <span>{t("common.disclaimer")}</span>
-            <Badge>{historyIds.length} steps</Badge>
-          </div>
+          <Badge>{historyIds.length}</Badge>
         </div>
       </Card>
     </div>

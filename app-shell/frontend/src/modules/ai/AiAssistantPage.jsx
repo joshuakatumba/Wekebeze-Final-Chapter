@@ -1,16 +1,16 @@
 import React, { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Bot, Plus, Send, Trash2, BookOpen, AlertTriangle, History, X } from "lucide-react";
+import { Plus, Send, Trash2, AlertTriangle, History, X } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "../../api/client";
 import { ENDPOINTS } from "../../api/endpoints";
 import { useI18n } from "../../context/I18nContext";
-import { PageHead, Card, Button, Badge } from "../../components/ui";
+import { Card, Badge } from "../../components/ui";
 
 const API_URL = import.meta.env.VITE_API_URL || "/api/v1";
 
 export default function AiAssistantPage() {
-  const { lang, t } = useI18n();
+  const { lang } = useI18n();
   const [conversations, setConversations] = useState([]);
   const [activeId, setActiveId] = useState(null);
   const [messages, setMessages] = useState([]);
@@ -61,7 +61,7 @@ export default function AiAssistantPage() {
       setHistoryOpen(false);
       return conv.id;
     } catch (e) {
-      toast.error(e.message || "Could not start conversation");
+      toast.error(e.message || "Could not start chat");
       return null;
     }
   };
@@ -76,7 +76,7 @@ export default function AiAssistantPage() {
         setMessages([]);
       }
     } catch {
-      toast.error("Failed to delete conversation");
+      toast.error("Delete failed");
     }
   };
 
@@ -108,7 +108,7 @@ export default function AiAssistantPage() {
         body: JSON.stringify({ content: text, language: lang }),
       });
 
-      if (!res.ok) throw new Error("AI assistant request failed");
+      if (!res.ok) throw new Error("Request failed");
 
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
@@ -143,59 +143,62 @@ export default function AiAssistantPage() {
         }
       }
     } catch (err) {
-      toast.error(err.message || "Error contacting AI assistant");
+      toast.error(err.message || "Error contacting assistant");
       setStreamDraft("");
     } finally {
       setStreaming(false);
     }
   };
 
-  const starterPrompts = lang === "lg"
-    ? [
-        "Obubonero bwa kookolo w'amabeere bwe buli wa?",
-        "Eddagala lya HPV liyamba litya?",
-        "Nsobola wa okwekebeza kookolo mu Uganda?",
-      ]
-    : [
-        "Early warning signs of breast cancer",
-        "How HPV vaccination prevents cervical cancer",
-        "Free screening centers in Uganda",
-      ];
+  const quickPrompts = lang === "lg"
+    ? ["Obubonero bwa kookolo?", "Okwekebeza mu Uganda?"]
+    : ["Early warning signs?", "Free screening in Uganda?"];
 
   return (
-    <div className="stack" style={{ gap: 18 }}>
-      <PageHead
-        title={t("ai.title")}
-        action={
-          <div className="row" style={{ gap: 8 }}>
-            <Button variant="outline" size="sm" onClick={() => setHistoryOpen(true)}>
-              <History size={15} /> History ({conversations.length})
-            </Button>
-            <Button variant="primary" size="sm" onClick={createConversation}>
-              <Plus size={15} /> {t("ai.new_chat")}
-            </Button>
-          </div>
-        }
-      />
+    <div className="stack" style={{ gap: 12 }}>
+      {/* Clean single-line header with icon-only actions */}
+      <div className="between">
+        <h1 className="page-head-title">{lang === "lg" ? "Omuyambi" : "Assistant"}</h1>
+        <div className="row" style={{ gap: 8, flexWrap: "nowrap" }}>
+          <button
+            type="button"
+            className="btn btn-outline"
+            onClick={() => setHistoryOpen(true)}
+            aria-label="History"
+            title="History"
+            style={{ width: 36, height: 36, minHeight: 36, padding: 0 }}
+          >
+            <History size={16} />
+          </button>
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={createConversation}
+            aria-label="New chat"
+            title="New chat"
+            style={{ width: 36, height: 36, minHeight: 36, padding: 0 }}
+          >
+            <Plus size={16} />
+          </button>
+        </div>
+      </div>
 
-      <Card style={{ padding: 0, display: "flex", flexDirection: "column", height: "calc(100vh - 210px)", minHeight: 520, overflow: "hidden" }}>
-        <div style={{ flex: 1, overflowY: "auto", padding: 28, display: "flex", flexDirection: "column", gap: 18, background: "var(--color-paper)" }}>
+      <Card style={{ padding: 0, display: "flex", flexDirection: "column", height: "calc(100vh - 190px)", minHeight: 460, overflow: "hidden" }}>
+        <div style={{ flex: 1, overflowY: "auto", padding: 20, display: "flex", flexDirection: "column", gap: 14, background: "var(--color-paper)" }}>
           {messages.length === 0 && !streamDraft ? (
-            <div style={{ margin: "auto", textAlign: "center", maxWidth: 460 }}>
-              <div style={{ width: 52, height: 52, borderRadius: "50%", background: "var(--color-linen-mist)", color: "var(--color-rose-600)", display: "inline-flex", alignItems: "center", justifyContent: "center", marginBottom: 14 }}>
-                <Bot size={26} />
-              </div>
-              <h3 style={{ margin: "0 0 18px", fontSize: 20 }}>{t("ai.title")}</h3>
-              <div className="stack" style={{ gap: 10 }}>
-                {starterPrompts.map((p) => (
+            <div style={{ margin: "auto", textAlign: "center", maxWidth: 360 }}>
+              <h3 style={{ margin: "0 0 14px", fontSize: 18, fontWeight: 500, color: "var(--text-secondary)" }}>
+                {lang === "lg" ? "Nnyinza kukuyamba ntya?" : "How can I help?"}
+              </h3>
+              <div className="row" style={{ justifyContent: "center", gap: 8 }}>
+                {quickPrompts.map((p) => (
                   <button
                     key={p}
                     type="button"
                     onClick={() => setInput(p)}
                     style={{
-                      padding: "12px 16px", borderRadius: 12, border: "1px solid var(--border-subtle)",
-                      background: "var(--surface-card)", color: "var(--text-primary)", fontSize: 14,
-                      textAlign: "left", cursor: "pointer",
+                      padding: "8px 14px", borderRadius: 9999, border: "1px solid var(--border-subtle)",
+                      background: "var(--surface-card)", color: "var(--text-primary)", fontSize: 13, cursor: "pointer",
                     }}
                   >
                     {p}
@@ -213,25 +216,24 @@ export default function AiAssistantPage() {
                     key={m.id}
                     style={{
                       alignSelf: isUser ? "flex-end" : "flex-start",
-                      maxWidth: "80%",
+                      maxWidth: "82%",
                       background: isUser ? "var(--color-lime-voltage)" : isUrgent ? "#fff1f2" : "var(--surface-card)",
                       color: isUser ? "#fff" : isUrgent ? "#881337" : "var(--text-primary)",
                       border: isUser ? "none" : `1px solid ${isUrgent ? "#f43f5e" : "var(--border-subtle)"}`,
-                      padding: "14px 18px",
+                      padding: "11px 15px",
                       borderRadius: isUser ? "18px 18px 4px 18px" : "4px 18px 18px 18px",
                       fontSize: 14,
-                      lineHeight: 1.65,
+                      lineHeight: 1.6,
                     }}
                   >
                     {isUrgent && (
-                      <div className="row" style={{ gap: 6, marginBottom: 8, fontWeight: 700, color: "#e11d48", fontSize: 13 }}>
-                        <AlertTriangle size={15} /> Urgent Medical Escalation
+                      <div className="row" style={{ gap: 6, marginBottom: 6, color: "#e11d48", fontSize: 12 }}>
+                        <AlertTriangle size={14} /> Urgent
                       </div>
                     )}
                     <div style={{ whiteSpace: "pre-wrap" }}>{m.content}</div>
                     {!isUser && Array.isArray(m.sources) && m.sources.length > 0 && (
-                      <div style={{ marginTop: 12, paddingTop: 10, borderTop: "1px solid var(--border-subtle)" }} className="row">
-                        <BookOpen size={13} color="var(--color-pebble)" />
+                      <div style={{ marginTop: 8, paddingTop: 8, borderTop: "1px solid var(--border-subtle)" }} className="row">
                         {m.sources.map((s, si) => (
                           <Badge key={si} tone="success">{s.title}</Badge>
                         ))}
@@ -241,7 +243,7 @@ export default function AiAssistantPage() {
                 );
               })}
               {streamDraft && (
-                <div style={{ alignSelf: "flex-start", maxWidth: "80%", background: "var(--surface-card)", border: "1px solid var(--border-subtle)", padding: "14px 18px", borderRadius: "4px 18px 18px 18px", fontSize: 14, lineHeight: 1.65, whiteSpace: "pre-wrap" }}>
+                <div style={{ alignSelf: "flex-start", maxWidth: "82%", background: "var(--surface-card)", border: "1px solid var(--border-subtle)", padding: "11px 15px", borderRadius: "4px 18px 18px 18px", fontSize: 14, lineHeight: 1.6, whiteSpace: "pre-wrap" }}>
                   {streamDraft}
                 </div>
               )}
@@ -255,17 +257,24 @@ export default function AiAssistantPage() {
             <input
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder={t("ai.placeholder")}
+              placeholder={lang === "lg" ? "Buuza ekibuuzo..." : "Ask a question..."}
               disabled={streaming}
               style={{
-                flex: 1, minWidth: 0, width: "100%", padding: "9px 13px", borderRadius: 9999,
+                flex: 1, minWidth: 0, width: "100%", padding: "9px 14px", borderRadius: 9999,
                 border: "1px solid var(--border-subtle)", background: "var(--color-paper)",
-                color: "var(--text-primary)", fontSize: 13, outline: "none",
+                color: "var(--text-primary)", fontSize: 13.5, outline: "none",
               }}
             />
-            <Button type="submit" variant="primary" size="sm" loading={streaming} disabled={!input.trim()}>
-              <Send size={13} /> {t("ai.send")}
-            </Button>
+            <button
+              type="submit"
+              className="btn btn-primary"
+              disabled={streaming || !input.trim()}
+              aria-label="Send"
+              title="Send"
+              style={{ width: 38, height: 38, minHeight: 38, padding: 0, flexShrink: 0 }}
+            >
+              <Send size={15} />
+            </button>
           </div>
         </form>
       </Card>
@@ -274,11 +283,11 @@ export default function AiAssistantPage() {
         <div className="drawer-overlay" onClick={() => setHistoryOpen(false)}>
           <div className="drawer" onClick={(e) => e.stopPropagation()}>
             <div className="modal-h">
-              <strong style={{ fontSize: 16 }}>Saved Conversations</strong>
+              <h2 style={{ margin: 0, fontSize: 16 }}>History</h2>
               <button
                 type="button"
                 onClick={() => setHistoryOpen(false)}
-                aria-label="Close history"
+                aria-label="Close"
                 style={{ background: "var(--surface-muted)", border: "none", width: 32, height: 32, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "var(--text-primary)" }}
               >
                 <X size={16} />
@@ -286,7 +295,7 @@ export default function AiAssistantPage() {
             </div>
             <div className="drawer-content">
               {conversations.length === 0 ? (
-                <p style={{ fontSize: 13, color: "var(--color-slate)", margin: 0 }}>No saved conversations yet.</p>
+                <p style={{ fontSize: 13, color: "var(--color-slate)", margin: 0 }}>Empty</p>
               ) : (
                 conversations.map((c) => (
                   <div
@@ -297,7 +306,7 @@ export default function AiAssistantPage() {
                       padding: "10px 12px", borderRadius: 10, cursor: "pointer",
                       background: activeId === c.id ? "var(--color-linen-mist)" : "var(--surface-muted)",
                       color: activeId === c.id ? "var(--color-rose-600)" : "var(--text-primary)",
-                      fontWeight: activeId === c.id ? 700 : 500, fontSize: 13,
+                      fontSize: 13,
                     }}
                   >
                     <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.title}</span>

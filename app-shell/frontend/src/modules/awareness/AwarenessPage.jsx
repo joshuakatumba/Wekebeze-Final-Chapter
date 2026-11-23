@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { BookOpen, Bot, ArrowRight } from "lucide-react";
+import { Bot } from "lucide-react";
 import { api } from "../../api/client";
 import { ENDPOINTS } from "../../api/endpoints";
 import { useI18n } from "../../context/I18nContext";
@@ -28,8 +28,8 @@ export default function AwarenessPage({ onNavigate }) {
       <PageHead
         title={t("awareness.title")}
         action={
-          <Button variant="primary" size="sm" onClick={() => onNavigate?.("ai_chat")}>
-            <Bot size={14} /> {t("awareness.ask_ai")}
+          <Button variant="primary" size="sm" onClick={() => onNavigate?.("ai_chat")} aria-label="AI Assistant" title="AI Assistant">
+            <Bot size={15} />
           </Button>
         }
       />
@@ -74,7 +74,7 @@ export default function AwarenessPage({ onNavigate }) {
               <h3 style={{ margin: 0, fontSize: 18 }}>{art.title}</h3>
               <div className="card-actions" style={{ marginTop: "auto" }}>
                 <Button variant="outline" size="sm" onClick={() => setSelected(art)}>
-                  <BookOpen size={14} /> Read <ArrowRight size={14} />
+                  Read
                 </Button>
               </div>
             </Card>

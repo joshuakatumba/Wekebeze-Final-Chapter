@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { CheckCircle2, XCircle, Award, ArrowLeft } from "lucide-react";
+import { CheckCircle2, XCircle, Award, X } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "../../api/client";
 import { ENDPOINTS } from "../../api/endpoints";
@@ -62,8 +62,8 @@ export default function QuizzesPage() {
         <PageHead
           title={activeQuiz.title}
           action={
-            <Button variant="outline" size="sm" onClick={() => { setActiveQuiz(null); setResult(null); }}>
-              <ArrowLeft size={14} /> {t("common.back")}
+            <Button variant="outline" size="sm" onClick={() => { setActiveQuiz(null); setResult(null); }} aria-label="Close">
+              <X size={14} />
             </Button>
           }
         />

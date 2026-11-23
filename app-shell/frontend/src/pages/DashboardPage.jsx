@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Bot, BookOpen, ArrowRight } from "lucide-react";
+import { Bot } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useI18n } from "../context/I18nContext";
 import { api } from "../api/client";
@@ -33,8 +33,8 @@ export default function DashboardPage({ onNavigate }) {
       <PageHead
         title={`Welcome, ${user.name}`}
         action={
-          <Button variant="primary" size="sm" onClick={() => onNavigate?.("ai_chat")}>
-            <Bot size={15} /> {t("awareness.ask_ai")}
+          <Button variant="primary" size="sm" onClick={() => onNavigate?.("ai_chat")} aria-label="AI Assistant" title="AI Assistant">
+            <Bot size={15} /> AI
           </Button>
         }
       />
@@ -53,10 +53,10 @@ export default function DashboardPage({ onNavigate }) {
             <p style={{ margin: 0, fontSize: 14, color: "var(--color-slate)", lineHeight: 1.5 }}>{cat.description}</p>
             <div className="card-actions" style={{ marginTop: "auto", paddingTop: 4 }}>
               <Button variant="primary" size="sm" onClick={() => onNavigate?.("guided_chat")}>
-                {t("awareness.start_guided")} <ArrowRight size={14} />
+                Start
               </Button>
               <Button variant="outline" size="sm" onClick={() => onNavigate?.("awareness")}>
-                <BookOpen size={14} /> Guides
+                Guides
               </Button>
             </div>
           </Card>
