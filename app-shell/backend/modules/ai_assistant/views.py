@@ -5,7 +5,17 @@ from django.utils import timezone
 from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
+from rest_framework.renderers import BaseRenderer, JSONRenderer
 from rest_framework.response import Response
+
+
+class EventStreamRenderer(BaseRenderer):
+    media_type = "text/event-stream"
+    format = "sse"
+    charset = "utf-8"
+
+    def render(self, data, accepted_media_type=None, renderer_context=None):
+        return data
 
 from core.concurrency import ConcurrencyBusyError, bounded_semaphore, distributed_mutex
 from core.permissions import has_role
@@ -39,7 +49,7 @@ class ConversationViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
 
-    @action(detail=True, methods=["get", "post"], url_path="messages")
+    @action(detail=True, methods=["get", "post"], url_path="messages", renderer_classes=[JSONRenderer, EventStreamRenderer])
     def messages(self, request, pk=None):
         conversation = self.get_object()
         if request.method == "GET":

@@ -103,7 +103,7 @@ export default function AiAssistantPage() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Accept: "text/event-stream",
+          Accept: "text/event-stream, application/json, */*",
           ...(token ? { Authorization: `Token ${token}` } : {}),
         },
         body: JSON.stringify({ content: text, language: lang }),
