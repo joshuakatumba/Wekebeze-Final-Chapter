@@ -1,0 +1,31 @@
+{
+  "name": "Wekebeze",
+  "accentName": "App",
+  "slug": "wekebeze-app",
+  "tagline": "Cancer Awareness, Knowledge and Support",
+  "description": "Empowering communities in Uganda through breast and cervical cancer awareness, AI-guided education, quizzes, and verified screening center discovery.",
+  "defaultLang": "en",
+  "languages": ["en", "lg"],
+  "theme": {
+    "primary": "#0f172a",
+    "accent": "#f43f5e",
+    "teal": "#14b8a6",
+    "surfaceDark": "#0f172a"
+  },
+  "roles": {
+    "user": "Platform User",
+    "provider": "Health Educator",
+    "admin": "Administrator"
+  },
+  "features": {
+    "googleAuth": true,
+    "otpAuth": false,
+    "fileManager": true,
+    "notifications": true,
+    "auditLogs": true,
+    "aiAssistant": true,
+    "guidedChat": true,
+    "quizzes": true,
+    "screeningLocator": true
+  }
+}

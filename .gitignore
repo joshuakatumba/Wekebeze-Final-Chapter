@@ -1,0 +1,50 @@
+# --- Markdown files: block ALL .md files except root README.md ---
+*.md
+*.MD
+!/README.md
+
+# --- Environment & Secret files: NEVER commit any .env files ---
+.env
+.env.*
+*.env
+**/.env
+**/.env.*
+*.pem
+*.key
+
+# --- Python / Django ---
+.venv/
+venv/
+env/
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.pytest_cache/
+db.sqlite3
+*.sqlite3
+staticfiles/
+media/
+
+# --- Node / React / Vite ---
+node_modules/
+dist/
+build/
+.vite/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+tsc-errors.txt
+
+# --- Legacy app folder (replaced by app-shell) ---
+wekebeze-app/
+
+# --- OS / IDE / Logs ---
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.log
+*.swp
+*.swo
+

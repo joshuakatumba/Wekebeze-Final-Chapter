@@ -1,0 +1,83 @@
+import math
+from django.utils import timezone
+from rest_framework import permissions, status, viewsets
+from rest_framework.decorators import action
+from rest_framework.response import Response
+
+from core.permissions import has_role
+from core.services import log_audit
+from .models import ScreeningCenter
+from .serializers import ScreeningCenterSerializer
+
+
+def haversine_km(lat1, lng1, lat2, lng2):
+    r = 6371.0
+    p1, p2 = math.radians(lat1), math.radians(lat2)
+    dp = math.radians(lat2 - lat1)
+    dl = math.radians(lng2 - lng1)
+    a = math.sin(dp / 2) ** 2 + math.cos(p1) * math.cos(p2) * math.sin(dl / 2) ** 2
+    return round(2 * r * math.asin(math.sqrt(a)), 2)
+
+
+class ScreeningCenterViewSet(viewsets.ModelViewSet):
+    serializer_class = ScreeningCenterSerializer
+    pagination_class = None
+
+    def get_permissions(self):
+        if self.action in ("list", "retrieve", "districts", "nearby"):
+            return [permissions.AllowAny()]
+        return [has_role("admin", "provider")()]
+
+    def get_queryset(self):
+        qs = ScreeningCenter.objects.prefetch_related("services").all()
+        user = self.request.user
+        if not (user.is_authenticated and (user.is_platform_admin or user.role == "provider")):
+            qs = qs.filter(status=ScreeningCenter.Status.ACTIVE)
+        district = self.request.query_params.get("district")
+        search = self.request.query_params.get("search")
+        if district and district != "All":
+            qs = qs.filter(district__iexact=district)
+        if search:
+            qs = qs.filter(name__icontains=search) | qs.filter(location__icontains=search) | qs.filter(district__icontains=search)
+        return qs
+
+    @action(detail=False, methods=["get"], url_path="districts")
+    def districts(self, request):
+        names = (
+            ScreeningCenter.objects.filter(status=ScreeningCenter.Status.ACTIVE)
+            .values_list("district", flat=True)
+            .distinct()
+            .order_by("district")
+        )
+        return Response(list(names))
+
+    @action(detail=False, methods=["get"], url_path="nearby")
+    def nearby(self, request):
+        try:
+            lat = float(request.query_params.get("lat"))
+            lng = float(request.query_params.get("lng"))
+            radius_km = float(request.query_params.get("radius_km", 50))
+        except (TypeError, ValueError):
+            return Response({"error": "Valid lat and lng query parameters are required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        results = []
+        for center in self.get_queryset():
+            dist = haversine_km(lat, lng, center.latitude, center.longitude)
+            if dist <= radius_km:
+                center.distance_km = dist
+                results.append(center)
+        results.sort(key=lambda c: c.distance_km)
+        return Response(ScreeningCenterSerializer(results, many=True).data)
+
+    def perform_create(self, serializer):
+        obj = serializer.save(verified_at=timezone.now() if serializer.validated_data.get("is_verified", True) else None)
+        log_audit(self.request, "screening.center.create", "ScreeningCenter", obj.id, {"name": obj.name})
+
+    def perform_update(self, serializer):
+        obj = serializer.save()
+        log_audit(self.request, "screening.center.update", "ScreeningCenter", obj.id, {"name": obj.name})
+
+    def perform_destroy(self, instance):
+        log_audit(self.request, "screening.center.delete", "ScreeningCenter", instance.id, {"name": instance.name})
+        instance.delete()
+

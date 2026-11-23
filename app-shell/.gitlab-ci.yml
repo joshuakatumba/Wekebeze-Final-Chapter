@@ -1,0 +1,28 @@
+stages:
+  - build
+  - test
+  - deploy
+
+default:
+  tags:
+    - $RUNNER_TAG
+
+build:
+  stage: build
+  script:
+    - docker compose build
+
+test_backend:
+  stage: test
+  script:
+    - docker compose run --rm --no-deps -e DB_ENGINE=sqlite3 -e DEBUG=True backend python manage.py check
+    - docker compose run --rm --no-deps -e DB_ENGINE=sqlite3 -e DEBUG=True backend python manage.py test
+
+deploy:
+  stage: deploy
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+  script:
+    - docker compose up -d --remove-orphans
+    - docker image prune -f
+

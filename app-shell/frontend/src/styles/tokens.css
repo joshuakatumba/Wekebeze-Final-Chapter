@@ -1,0 +1,45 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&family=Outfit:wght@500;600;700;800;900&display=swap');
+
+:root {
+  /* Wekebeze Bright Palette — Crisp White, Warm Rose, Fresh Teal (No Dark Blue) */
+  --color-forest-ink: #e11d48;
+  --color-lime-voltage: #f43f5e;
+  --color-spruce: #be123c;
+  --color-linen-mist: #fff1f2;
+  --color-rose-100: #ffe4e6;
+  --color-rose-600: #e11d48;
+  --color-teal: #14b8a6;
+  --color-teal-dark: #0d9488;
+  --color-teal-soft: #f0fdfa;
+  --color-signal-blue: #0d9488;
+  --color-alarm-red: #e11d48;
+  --color-charcoal: #374151;
+  --color-obsidian: #1f2937;
+  --color-pebble: #6b7280;
+  --color-slate: #4b5563;
+  --color-fog: #f3f4f6;
+  --color-paper: #fafbfc;
+
+  /* Bright Semantic Tokens */
+  --surface-dark: #ffffff;
+  --surface-dark-hover: #fff1f2;
+  --text-on-dark: #1f2937;
+  --text-primary: #1f2937;
+  --text-secondary: #4b5563;
+  --surface-card: #ffffff;
+  --surface-muted: #f3f4f6;
+  --border-subtle: #e5e7eb;
+
+  /* Typography & Layout */
+  --font-heading: 'Outfit', 'Inter', ui-sans-serif, system-ui, sans-serif;
+  --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  --page-max-width: 1200px;
+  --radius-cards: 14px;
+  --radius-inputs: 12px;
+  --radius-buttons: 9999px;
+  --radius-largecards: 24px;
+  --shadow-subtle: rgba(17, 24, 39, 0.06) 0px 0px 0px 1px;
+  --shadow-lg: rgba(244, 63, 94, 0.06) 0px 6px 20px 0px;
+  --shadow-xl: rgba(17, 24, 39, 0.1) 0px 12px 32px 0px;
+}

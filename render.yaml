@@ -1,0 +1,57 @@
+# Render Blueprint for Wekebeze Cancer Awareness Platform
+# Deploy directly from GitHub: New -> Blueprint -> Select this repository.
+
+databases:
+  - name: wekebeze-db
+    databaseName: wekebeze
+    user: wekebeze
+    plan: free
+
+services:
+  - type: web
+    name: wekebeze-api
+    runtime: python
+    plan: free
+    rootDir: app-shell/backend
+    buildCommand: pip install -r requirements.txt && python manage.py collectstatic --noinput
+    startCommand: python manage.py migrate --noinput && python manage.py seed_wekebeze && gunicorn config.wsgi:application --bind 0.0.0.0:$PORT --workers 2
+    healthCheckPath: /api/v1/core/health/
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.3"
+      - key: DEBUG
+        value: "False"
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DATABASE_URL
+        fromDatabase:
+          name: wekebeze-db
+          property: connectionString
+      - key: ALLOWED_HOSTS
+        value: ".onrender.com,localhost,127.0.0.1"
+      - key: CORS_ALLOWED_ORIGINS
+        value: "https://wekebeze-web.onrender.com,http://localhost:3005,http://localhost:5173"
+      - key: CSRF_TRUSTED_ORIGINS
+        value: "https://wekebeze-web.onrender.com,https://wekebeze-api.onrender.com"
+      - key: LLM_API_KEY
+        sync: false
+      - key: LLM_MODEL
+        value: "gpt-4o-mini"
+
+  - type: web
+    name: wekebeze-web
+    runtime: static
+    rootDir: app-shell/frontend
+    buildCommand: npm install && npm run build
+    staticPublishPath: dist
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
+      - key: VITE_API_URL
+        value: "https://wekebeze-api.onrender.com/api/v1"
+      - key: VITE_APP_NAME
+        value: "Wekebeze"

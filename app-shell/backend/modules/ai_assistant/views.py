@@ -1,0 +1,200 @@
+import json
+from django.db import transaction
+from django.http import StreamingHttpResponse
+from django.utils import timezone
+from rest_framework import permissions, status, viewsets
+from rest_framework.decorators import action
+from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
+from rest_framework.response import Response
+
+from core.concurrency import ConcurrencyBusyError, bounded_semaphore, distributed_mutex
+from core.permissions import has_role
+from core.services import log_audit
+from .graph import run_chat_graph
+from .models import Conversation, KnowledgeDocument, Message
+from .rag import ingest_document
+from .serializers import (
+    ConversationDetailSerializer,
+    ConversationSerializer,
+    KnowledgeDocumentSerializer,
+    MessageSerializer,
+)
+
+
+class ConversationViewSet(viewsets.ModelViewSet):
+    """Strictly user-owned AI conversations protected by per-conversation mutex & inference semaphore."""
+
+    permission_classes = [permissions.IsAuthenticated]
+    pagination_class = None
+
+    def get_queryset(self):
+        return Conversation.objects.filter(user=self.request.user).prefetch_related("messages")
+
+    def get_serializer_class(self):
+        if self.action == "retrieve":
+            return ConversationDetailSerializer
+        return ConversationSerializer
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+
+    @action(detail=True, methods=["get", "post"], url_path="messages")
+    def messages(self, request, pk=None):
+        conversation = self.get_object()
+        if request.method == "GET":
+            return Response(MessageSerializer(conversation.messages.all(), many=True).data)
+
+        content = (request.data.get("content") or "").strip()
+        language = request.data.get("language") or conversation.language or "en"
+        if not content:
+            return Response({"error": "Message content is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            with distributed_mutex(f"ai:conv:{conversation.id}", ttl_seconds=30):
+                with bounded_semaphore("ai:inference", max_concurrent=10, ttl_seconds=35):
+                    with transaction.atomic():
+                        locked_conv = Conversation.objects.select_for_update().get(pk=conversation.pk)
+                        if locked_conv.messages.count() == 0 and locked_conv.title == "New Conversation":
+                            locked_conv.title = content[:60] + ("…" if len(content) > 60 else "")
+                            locked_conv.language = language
+                            locked_conv.save(update_fields=["title", "language", "updated_at"])
+
+                        history = [
+                            {"role": m.role, "content": m.content}
+                            for m in locked_conv.messages.order_by("created_at")
+                        ]
+                        user_msg = Message.objects.create(
+                            conversation=locked_conv,
+                            role=Message.Role.USER,
+                            content=content,
+                        )
+
+                    result = run_chat_graph(content, language=language, history=history)
+                    assistant_text = result.get("response", "")
+                    sources = result.get("sources", [])
+                    is_urgent = bool(result.get("is_urgent", False))
+
+                    with transaction.atomic():
+                        locked_conv = Conversation.objects.select_for_update().get(pk=conversation.pk)
+                        assistant_msg = Message.objects.create(
+                            conversation=locked_conv,
+                            role=Message.Role.ASSISTANT,
+                            content=assistant_text,
+                            sources=sources,
+                            metadata={"language": result.get("language", language), "is_urgent": is_urgent},
+                        )
+                        locked_conv.updated_at = timezone.now()
+                        locked_conv.save(update_fields=["updated_at"])
+                        final_title = locked_conv.title
+        except ConcurrencyBusyError as exc:
+            return Response({"error": str(exc)}, status=status.HTTP_429_TOO_MANY_REQUESTS)
+
+        want_stream = (
+            request.query_params.get("stream") == "1"
+            or "text/event-stream" in request.META.get("HTTP_ACCEPT", "")
+        )
+        if want_stream:
+            def event_stream():
+                words = assistant_text.split(" ")
+                for i in range(0, len(words), 4):
+                    chunk = " ".join(words[i : i + 4]) + (" " if i + 4 < len(words) else "")
+                    yield f"data: {json.dumps({'type': 'token', 'content': chunk})}\n\n"
+                yield f"data: {json.dumps({'type': 'done', 'user_message': MessageSerializer(user_msg).data, 'assistant_message': MessageSerializer(assistant_msg).data, 'conversation_title': final_title})}\n\n"
+
+            resp = StreamingHttpResponse(event_stream(), content_type="text/event-stream")
+            resp["Cache-Control"] = "no-cache"
+            return resp
+
+        return Response({
+            "user_message": MessageSerializer(user_msg).data,
+            "assistant_message": MessageSerializer(assistant_msg).data,
+            "conversation_title": final_title,
+        }, status=status.HTTP_201_CREATED)
+
+
+class KnowledgeDocumentViewSet(viewsets.ModelViewSet):
+    serializer_class = KnowledgeDocumentSerializer
+    permission_classes = [has_role("admin", "provider")]
+    parser_classes = [JSONParser, MultiPartParser, FormParser]
+    pagination_class = None
+
+    def get_queryset(self):
+        qs = KnowledgeDocument.objects.select_related("reviewed_by").all()
+        status_filter = self.request.query_params.get("review_status")
+        language = self.request.query_params.get("language")
+        if status_filter:
+            qs = qs.filter(review_status=status_filter)
+        if language:
+            qs = qs.filter(language=language)
+        return qs
+
+    def perform_create(self, serializer):
+        with bounded_semaphore("ai:ingest", max_concurrent=4):
+            doc = serializer.save()
+            if doc.review_status == KnowledgeDocument.ReviewStatus.APPROVED:
+                doc.reviewed_by = self.request.user
+                doc.published_at = timezone.now()
+                doc.save(update_fields=["reviewed_by", "published_at"])
+                ingest_document(doc)
+            log_audit(self.request, "ai.knowledge.create", "KnowledgeDocument", doc.id, {"title": doc.title})
+
+    def perform_update(self, serializer):
+        instance = self.get_object()
+        with distributed_mutex(f"ai:doc:{instance.id}", ttl_seconds=20):
+            with bounded_semaphore("ai:ingest", max_concurrent=4):
+                with transaction.atomic():
+                    doc = serializer.save()
+                    if doc.review_status == KnowledgeDocument.ReviewStatus.APPROVED:
+                        ingest_document(doc)
+                    elif doc.review_status == KnowledgeDocument.ReviewStatus.ARCHIVED:
+                        doc.chunks.all().delete()
+                    log_audit(self.request, "ai.knowledge.update", "KnowledgeDocument", doc.id, {"title": doc.title})
+
+    @action(detail=True, methods=["post"], url_path="approve")
+    def approve(self, request, pk=None):
+        doc = self.get_object()
+        try:
+            with distributed_mutex(f"ai:doc:{doc.id}", ttl_seconds=20):
+                with bounded_semaphore("ai:ingest", max_concurrent=4):
+                    with transaction.atomic():
+                        locked = KnowledgeDocument.objects.select_for_update().get(pk=doc.pk)
+                        locked.review_status = KnowledgeDocument.ReviewStatus.APPROVED
+                        locked.reviewed_by = request.user
+                        locked.published_at = timezone.now()
+                        locked.save(update_fields=["review_status", "reviewed_by", "published_at", "updated_at"])
+                        chunk_count = ingest_document(locked)
+                        log_audit(request, "ai.knowledge.approve", "KnowledgeDocument", locked.id, {"title": locked.title, "chunks": chunk_count})
+                        return Response(KnowledgeDocumentSerializer(locked).data)
+        except ConcurrencyBusyError as exc:
+            return Response({"error": str(exc)}, status=status.HTTP_409_CONFLICT)
+
+    @action(detail=False, methods=["post"], url_path="upload")
+    def upload(self, request):
+        """Allow admins/educators to upload a .txt/.md medical guideline file into the knowledge base."""
+        uploaded = request.FILES.get("file")
+        if not uploaded:
+            return Response({"error": "No file uploaded."}, status=status.HTTP_400_BAD_REQUEST)
+        text = uploaded.read().decode("utf-8", errors="ignore").strip()
+        if not text:
+            return Response({"error": "Uploaded file is empty."}, status=status.HTTP_400_BAD_REQUEST)
+
+        title = request.data.get("title") or uploaded.name.rsplit(".", 1)[0].replace("_", " ").title()
+        source = request.data.get("source") or "Admin Uploaded Guideline"
+        language = request.data.get("language") or "en"
+        auto_approve = str(request.data.get("approve", "false")).lower() in ("true", "1", "yes")
+
+        with bounded_semaphore("ai:ingest", max_concurrent=4):
+            with transaction.atomic():
+                doc = KnowledgeDocument.objects.create(
+                    title=title,
+                    source=source,
+                    language=language,
+                    content=text,
+                    review_status=KnowledgeDocument.ReviewStatus.APPROVED if auto_approve else KnowledgeDocument.ReviewStatus.DRAFT,
+                    reviewed_by=request.user if auto_approve else None,
+                    published_at=timezone.now() if auto_approve else None,
+                )
+                if auto_approve:
+                    ingest_document(doc)
+                log_audit(request, "ai.knowledge.upload", "KnowledgeDocument", doc.id, {"title": doc.title})
+        return Response(KnowledgeDocumentSerializer(doc).data, status=status.HTTP_201_CREATED)
