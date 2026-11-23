@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Plus, Send, Trash2, AlertTriangle, History, X, ThumbsUp, ThumbsDown, Sparkles } from "lucide-react";
+import { Plus, Send, Trash2, AlertTriangle, History, X, ThumbsUp, ThumbsDown } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "../../api/client";
 import { ENDPOINTS } from "../../api/endpoints";
@@ -153,16 +153,18 @@ function FormattedMessage({ content, isStreaming = false }) {
   );
 }
 
-/** Claude-style breathing orb + shimmer thinking indicator */
+/** Tactile three-dot bouncing thinking bubble */
 function ThinkingIndicator({ lang }) {
   return (
-    <div className="ai-thinking" role="status" aria-live="polite">
-      <span className="ai-think-orb" aria-hidden="true">
-        <Sparkles size={12} />
-      </span>
-      <span className="ai-think-text">
-        {lang === "lg" ? "Aliko alowooza..." : "Thinking..."}
-      </span>
+    <div
+      className="ai-thinking"
+      role="status"
+      aria-live="polite"
+      aria-label={lang === "lg" ? "Aliko alowooza" : "Assistant is thinking"}
+    >
+      <span className="ai-dot" />
+      <span className="ai-dot" />
+      <span className="ai-dot" />
     </div>
   );
 }

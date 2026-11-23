@@ -373,13 +373,15 @@ input, select, textarea { min-width: 0; max-width: 100%; }
   animation: aiClaudeFadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
-@keyframes aiOrbPulse {
-  0%, 100% { transform: scale(0.92) rotate(0deg); opacity: 0.85; }
-  50% { transform: scale(1.08) rotate(180deg); opacity: 1; }
-}
-@keyframes aiThinkShimmer {
-  0% { background-position: 100% 50%; }
-  100% { background-position: -100% 50%; }
+@keyframes aiDotBounce {
+  0%, 60%, 100% {
+    transform: translateY(0) scale(0.85);
+    opacity: 0.4;
+  }
+  30% {
+    transform: translateY(-5px) scale(1.12);
+    opacity: 1;
+  }
 }
 @keyframes aiCursorBlink {
   0%, 100% { opacity: 0.25; transform: scale(0.85); }
@@ -387,29 +389,25 @@ input, select, textarea { min-width: 0; max-width: 100%; }
 }
 .ai-thinking {
   align-self: flex-start;
-  display: inline-flex; align-items: center; gap: 10px;
-  padding: 10px 14px;
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 13px 16px;
   background: #ffffff;
   border-radius: 6px 18px 18px 18px;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
-  animation: aiClaudeFadeIn 0.28s ease-out both;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
+  animation: aiClaudeFadeIn 0.25s ease-out both;
 }
-.ai-think-orb {
-  width: 22px; height: 22px; border-radius: 50%;
-  background: linear-gradient(135deg, #f43f5e 0%, #14b8a6 100%);
-  color: #ffffff;
-  display: inline-flex; align-items: center; justify-content: center;
-  flex-shrink: 0;
-  animation: aiOrbPulse 2.2s ease-in-out infinite;
+.ai-dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--color-lime-voltage);
+  animation: aiDotBounce 1.25s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite;
 }
-.ai-think-text {
-  font-size: 13.5px; font-weight: 500;
-  background: linear-gradient(90deg, #94a3b8 0%, #f43f5e 45%, #14b8a6 65%, #94a3b8 100%);
-  background-size: 220% 100%;
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  animation: aiThinkShimmer 1.8s linear infinite;
+.ai-dot:nth-child(2) {
+  animation-delay: 0.16s;
+  background: #fb7185;
+}
+.ai-dot:nth-child(3) {
+  animation-delay: 0.32s;
+  background: var(--color-teal);
 }
 .ai-stream-cursor {
   display: inline-block; width: 7px; height: 7px; border-radius: 50%;
