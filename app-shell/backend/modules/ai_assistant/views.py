@@ -110,10 +110,11 @@ class ConversationViewSet(viewsets.ModelViewSet):
                 for i in range(0, len(words), 4):
                     chunk = " ".join(words[i : i + 4]) + (" " if i + 4 < len(words) else "")
                     yield f"data: {json.dumps({'type': 'token', 'content': chunk})}\n\n"
-                yield f"data: {json.dumps({'type': 'done', 'user_message': MessageSerializer(user_msg).data, 'assistant_message': MessageSerializer(assistant_msg).data, 'conversation_title': final_title})}\n\n"
+                yield f"data: {json.dumps({'type': 'done', 'user_message': MessageSerializer(user_msg).data, 'assistant_message': MessageSerializer(assistant_msg).data, 'conversation_title': final_title}, default=str)}\n\n"
 
             resp = StreamingHttpResponse(event_stream(), content_type="text/event-stream")
             resp["Cache-Control"] = "no-cache"
+            resp["X-Accel-Buffering"] = "no"
             return resp
 
         return Response({
