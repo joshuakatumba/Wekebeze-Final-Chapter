@@ -8,6 +8,8 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-appshell_secret}
     volumes:
       - pg_data:/var/lib/postgresql/data
+    networks:
+      - wekebeze_net
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-appshell}"]
       interval: 5s
@@ -17,6 +19,8 @@ services:
   redis:
     image: redis:7-alpine
     restart: unless-stopped
+    networks:
+      - wekebeze_net
 
   backend:
     build: ./backend
@@ -30,6 +34,8 @@ services:
       - "${BACKEND_PORT:-8005}:8000"
     volumes:
       - media_data:/app/media
+    networks:
+      - wekebeze_net
     depends_on:
       db:
         condition: service_healthy
@@ -44,10 +50,16 @@ services:
     restart: unless-stopped
     ports:
       - "${FRONTEND_PORT:-3005}:80"
+    networks:
+      - wekebeze_net
     depends_on:
       - backend
+
+networks:
+  wekebeze_net:
+    name: wekebeze_net
+    driver: bridge
 
 volumes:
   pg_data:
   media_data:
-

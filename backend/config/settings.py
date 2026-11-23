@@ -13,6 +13,10 @@ RENDER_HOSTNAME = os.environ.get("RENDER_EXTERNAL_HOSTNAME", "").strip()
 if RENDER_HOSTNAME and RENDER_HOSTNAME not in ALLOWED_HOSTS:
     ALLOWED_HOSTS.append(RENDER_HOSTNAME)
 
+FRONTEND_DIST_DIR = BASE_DIR / "frontend_dist"
+if FRONTEND_DIST_DIR.exists():
+    WHITENOISE_ROOT = FRONTEND_DIST_DIR
+
 USE_X_FORWARDED_HOST = True
 USE_X_FORWARDED_PORT = True
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
@@ -40,6 +44,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.middleware.gzip.GZipMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "corsheaders.middleware.CorsMiddleware",
@@ -62,6 +67,12 @@ CSRF_TRUSTED_ORIGINS = [
     for o in os.environ.get("CSRF_TRUSTED_ORIGINS", "http://localhost:3000,http://localhost:8000").split(",")
     if o.strip()
 ]
+if RENDER_HOSTNAME:
+    render_origin = f"https://{RENDER_HOSTNAME}"
+    if render_origin not in CORS_ALLOWED_ORIGINS:
+        CORS_ALLOWED_ORIGINS.append(render_origin)
+    if render_origin not in CSRF_TRUSTED_ORIGINS:
+        CSRF_TRUSTED_ORIGINS.append(render_origin)
 
 ROOT_URLCONF = "config.urls"
 WSGI_APPLICATION = "config.wsgi.application"
