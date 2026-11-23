@@ -158,8 +158,8 @@ export default function QuizzesPage() {
       )}
 
       {attempts.length > 0 && (
-        <Card>
-          <h3 style={{ margin: "0 0 12px", fontSize: 16 }}>Your Recent Attempts</h3>
+        <Card style={{ overflowX: "auto" }}>
+          <h3 style={{ margin: "0 0 12px", fontSize: 16 }}>Recent Attempts</h3>
           <table className="tbl">
             <thead>
               <tr>

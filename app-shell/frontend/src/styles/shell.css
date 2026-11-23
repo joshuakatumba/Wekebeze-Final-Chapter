@@ -6,8 +6,10 @@ html, body {
   font-weight: 400;
   background: var(--color-paper);
   color: var(--text-primary);
+  overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
 }
+img { max-width: 100%; }
 h1, h2 { font-family: var(--font-heading); font-weight: 700; letter-spacing: -0.02em; }
 h3, h4 { font-family: var(--font-heading); font-weight: 600; letter-spacing: -0.01em; }
 strong, b { font-weight: 600; }
@@ -127,8 +129,8 @@ button, input, select, textarea { font-family: inherit; }
 }
 
 /* Cards, Stats, Badges, Buttons */
-.card { background: var(--surface-card); border: 1px solid var(--border-subtle); border-radius: var(--radius-cards); padding: 16px; }
-.stat { background: var(--surface-card); border: 1px solid var(--border-subtle); border-radius: var(--radius-cards); padding: 14px 16px; }
+.card { background: var(--surface-card); border: 1px solid var(--border-subtle); border-radius: var(--radius-cards); padding: 16px; min-width: 0; overflow-wrap: anywhere; }
+.stat { background: var(--surface-card); border: 1px solid var(--border-subtle); border-radius: var(--radius-cards); padding: 14px 16px; min-width: 0; }
 .stat-label { font-size: 12px; color: var(--color-slate); font-weight: 400; }
 .stat-val { font-family: var(--font-heading); font-size: 22px; font-weight: 600; color: var(--text-primary); margin-top: 4px; letter-spacing: -0.02em; }
 .stat-sub { font-size: 11px; color: var(--color-pebble); margin-top: 2px; }
@@ -195,11 +197,20 @@ input, select, textarea { min-width: 0; max-width: 100%; }
 }
 .modal {
   background: var(--surface-card); color: var(--text-primary); border-radius: var(--radius-largecards);
-  width: 100%; max-width: 440px; max-height: 90vh; display: flex; flex-direction: column; overflow: hidden; box-shadow: var(--shadow-xl);
+  width: 100%; max-width: 460px; max-height: 90dvh; display: flex; flex-direction: column; overflow: hidden; box-shadow: var(--shadow-xl);
 }
-.modal-h { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid var(--border-subtle); }
-.modal-b { padding: 18px 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 14px; }
-.modal-f { padding: 14px 20px; border-top: 1px solid var(--border-subtle); }
+.modal-h { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 14px 18px; border-bottom: 1px solid var(--border-subtle); }
+.modal-b { padding: 16px 18px; overflow-y: auto; -webkit-overflow-scrolling: touch; display: flex; flex-direction: column; gap: 14px; }
+.modal-f { padding: 12px 18px; border-top: 1px solid var(--border-subtle); }
+@media (max-width: 640px) {
+  .veil { align-items: flex-end; padding: 0; }
+  .modal { max-width: 100%; max-height: 88dvh; border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
+  .modal-b { padding-bottom: calc(20px + env(safe-area-inset-bottom, 0px)); }
+  .modal-f { padding-bottom: calc(14px + env(safe-area-inset-bottom, 0px)); }
+  .shell { padding: 16px 14px; }
+  .main-content { padding-top: 16px !important; padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px)) !important; }
+  .card { padding: 14px !important; }
+}
 
 .drawer-overlay { position: fixed; inset: 0; background: rgba(14, 15, 12, 0.45); z-index: 120; }
 .drawer {
@@ -252,12 +263,12 @@ input, select, textarea { min-width: 0; max-width: 100%; }
 /* Borderless Full-Screen Sticky Chat */
 .chat-sticky-wrap {
   display: flex; flex-direction: column;
-  height: calc(100dvh - 118px);
-  margin: -16px -16px -40px;
+  height: calc(100dvh - 108px - env(safe-area-inset-bottom, 0px));
+  margin: -16px -14px -72px;
   background: var(--color-paper);
 }
 @media (min-width: 768px) {
-  .chat-sticky-wrap { height: calc(100dvh - 96px); margin: -16px 0 -32px; }
+  .chat-sticky-wrap { height: calc(100dvh - 92px); margin: -16px 0 -32px; }
 }
 .chat-sticky-head {
   display: flex; align-items: center; justify-content: space-between; gap: 10px;

@@ -104,7 +104,7 @@ export default function AdminUsersPage() {
                 <h3 style={{ margin: "0 0 2px", fontSize: 16 }}>{u.name}</h3>
                 <div style={{ fontSize: 13, color: "var(--color-slate)" }}>{u.email}</div>
               </div>
-              <div className="row" style={{ gap: 8, marginTop: "auto", flexWrap: "nowrap" }}>
+              <div className="row" style={{ gap: 8, marginTop: "auto" }}>
                 <Select value={u.role} options={ROLE_OPTIONS} onChange={(val) => changeRole(u, val)} />
                 {!u.is_verified && (
                   <Button variant="teal" size="sm" onClick={() => verify(u)}>Verify</Button>

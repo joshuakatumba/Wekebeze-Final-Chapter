@@ -129,8 +129,8 @@ export default function ScreeningPage() {
       {loading ? (
         <div className="grid g2">{[1, 2].map((i) => <div key={i} className="skeleton" style={{ height: 150 }} />)}</div>
       ) : view === "map" ? (
-        <Card style={{ padding: 8 }}>
-          <div ref={mapElRef} style={{ height: 500, width: "100%", borderRadius: 10 }} />
+        <Card style={{ padding: 6 }}>
+          <div ref={mapElRef} style={{ height: "min(62dvh, 500px)", width: "100%", borderRadius: 10 }} />
         </Card>
       ) : filtered.length === 0 ? (
         <EmptyState title={t("common.empty")} />

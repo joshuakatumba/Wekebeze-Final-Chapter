@@ -45,7 +45,7 @@ export default function LandingPage({ onOpenAuth }) {
           <img
             src={heroImage}
             alt={heroTitle}
-            style={{ width: "100%", height: 260, objectFit: "cover", borderRadius: 20 }}
+            style={{ width: "100%", height: "clamp(190px, 34vw, 270px)", objectFit: "cover", borderRadius: 18 }}
           />
         </div>
       </section>
