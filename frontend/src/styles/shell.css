@@ -266,30 +266,32 @@ input, select, textarea { min-width: 0; max-width: 100%; }
   height: calc(100dvh - 108px - env(safe-area-inset-bottom, 0px));
   margin: -16px -14px -72px;
   background: var(--color-paper);
-  overflow-x: hidden;
-  width: calc(100% + 28px);
+  overflow: hidden;
+}
+@media (min-width: 641px) and (max-width: 767px) {
+  .chat-sticky-wrap { margin: -28px -16px -80px; }
 }
 @media (min-width: 768px) {
-  .chat-sticky-wrap { height: calc(100dvh - 92px); margin: -16px 0 -32px; width: 100%; }
+  .chat-sticky-wrap { height: calc(100dvh - 92px); margin: -16px 0 -32px; }
 }
 .chat-sticky-head {
   display: flex; align-items: center; justify-content: space-between; gap: 10px;
   padding: 10px 14px; background: var(--color-paper);
-  max-width: 780px; width: 100%; margin: 0 auto;
+  max-width: 780px; width: 100%; margin: 0 auto; flex-shrink: 0;
 }
 .chat-sticky-body {
-  flex: 1; overflow-y: auto; overflow-x: hidden;
+  flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden;
   -webkit-overflow-scrolling: touch;
-  padding: 8px 12px 18px;
+  padding: 8px 12px 24px;
 }
 .chat-sticky-inner {
-  max-width: 780px; width: 100%; min-height: 100%; margin: 0 auto;
+  max-width: 780px; width: 100%; min-width: 0; min-height: 100%; margin: 0 auto;
   display: flex; flex-direction: column; gap: 14px;
 }
 .chat-sticky-bar {
   position: sticky; bottom: 0; padding: 8px 12px 10px;
   background: var(--color-paper);
-  max-width: 780px; width: 100%; margin: 0 auto;
+  max-width: 780px; width: 100%; margin: 0 auto; flex-shrink: 0;
 }
 
 /* Mobile-first AI Message Bubbles & Structured Prose */
@@ -312,6 +314,7 @@ input, select, textarea { min-width: 0; max-width: 100%; }
   width: 100%;
   max-width: 100%;
   min-width: 0;
+  overflow: hidden;
   background: #ffffff;
   color: var(--text-primary);
   padding: 14px 15px;
@@ -329,10 +332,10 @@ input, select, textarea { min-width: 0; max-width: 100%; }
 @media (min-width: 768px) {
   .ai-user-bubble { max-width: 74%; }
   .ai-msg-bubble { width: auto; max-width: 90%; padding: 16px 20px; }
-  .chat-sticky-body { padding: 12px 16px 20px; }
+  .chat-sticky-body { padding: 12px 16px 24px; }
 }
 
-.ai-prose { font-size: 14px; line-height: 1.62; color: inherit; min-width: 0; overflow-wrap: anywhere; }
+.ai-prose { font-size: 14px; line-height: 1.62; color: inherit; min-width: 0; max-width: 100%; overflow-wrap: anywhere; }
 .ai-prose h4 { margin: 12px 0 6px; font-size: 15px; font-weight: 600; color: var(--text-primary); line-height: 1.35; }
 .ai-prose h4:first-child { margin-top: 0; }
 .ai-prose p { margin: 6px 0; }
@@ -353,10 +356,12 @@ input, select, textarea { min-width: 0; max-width: 100%; }
 
 .ai-sources {
   margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--border-subtle);
-  display: flex; flex-wrap: wrap; gap: 6px;
+  display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; max-width: 100%;
 }
 .ai-sources .badge {
-  white-space: normal; max-width: 100%; line-height: 1.3; text-align: left;
+  display: inline-block; width: auto; max-width: 100%;
+  white-space: normal; overflow-wrap: anywhere; word-break: break-word;
+  line-height: 1.35; text-align: left;
 }
 
 /* Claude-Style Thinking & Streaming Fade-In Animations */
