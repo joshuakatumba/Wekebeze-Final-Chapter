@@ -1,7 +1,33 @@
 /**
- * Central navigation map — drives Desktop Sidebar, Mobile BottomNav, and MoreSheet.
+ * Central navigation map — drives Desktop Sidebar Drawer, Mobile BottomNav, and MoreSheet.
  */
 export function getNavigation(role, t) {
+  // Strictly 5 focused sections for Administrators
+  if (role === "admin") {
+    const adminTabs = [
+      { id: "dashboard", label: "Dashboard", icon: "bx-pie-chart-alt-2" },
+      { id: "users", label: "Users", icon: "bx-group" },
+      { id: "content", label: "Content", icon: "bx-book-content" },
+      { id: "knowledge", label: "AI Docs", icon: "bx-brain" },
+      { id: "centers", label: "Centers", icon: "bx-map-pin" },
+    ];
+    return { sidebar: adminTabs, bottom: adminTabs.slice(0, 4), more: adminTabs.slice(4) };
+  }
+
+  // Health Educators: content curation + awareness/AI tools
+  if (role === "provider") {
+    const eduTabs = [
+      { id: "dashboard", label: t("nav.dashboard"), icon: "bx-home-alt-2" },
+      { id: "content", label: "Content", icon: "bx-book-content" },
+      { id: "knowledge", label: "AI Docs", icon: "bx-brain" },
+      { id: "ai_chat", label: t("nav.ai_chat"), icon: "bx-bot" },
+      { id: "awareness", label: t("nav.awareness"), icon: "bx-book-heart" },
+      { id: "profile", label: t("nav.profile"), icon: "bx-user" },
+    ];
+    return { sidebar: eduTabs, bottom: eduTabs.slice(0, 4), more: eduTabs.slice(4) };
+  }
+
+  // Standard Platform Users
   const userTabs = [
     { id: "dashboard", label: t("nav.dashboard"), icon: "bx-home-alt-2" },
     { id: "awareness", label: t("nav.awareness"), icon: "bx-book-heart" },
@@ -9,35 +35,7 @@ export function getNavigation(role, t) {
     { id: "screening", label: t("nav.screening"), icon: "bx-map-pin" },
     { id: "guided_chat", label: t("nav.guided_chat"), icon: "bx-conversation" },
     { id: "quizzes", label: t("nav.quizzes"), icon: "bx-check-shield" },
-    { id: "notifications", label: t("nav.notifications"), icon: "bx-bell" },
     { id: "profile", label: t("nav.profile"), icon: "bx-user" },
   ];
-
-  if (role === "admin") {
-    const all = [
-      { id: "dashboard", label: t("nav.dashboard"), icon: "bx-pie-chart-alt-2" },
-      { id: "admin_content", label: t("nav.admin_content"), icon: "bx-slider-alt" },
-      { id: "users", label: t("nav.users"), icon: "bx-group" },
-      { id: "ai_chat", label: t("nav.ai_chat"), icon: "bx-bot" },
-      { id: "awareness", label: t("nav.awareness"), icon: "bx-book-heart" },
-      { id: "guided_chat", label: t("nav.guided_chat"), icon: "bx-conversation" },
-      { id: "quizzes", label: t("nav.quizzes"), icon: "bx-check-shield" },
-      { id: "screening", label: t("nav.screening"), icon: "bx-map-pin" },
-      { id: "files", label: t("nav.files"), icon: "bx-folder" },
-      { id: "notifications", label: t("nav.notifications"), icon: "bx-bell" },
-      { id: "profile", label: t("nav.profile"), icon: "bx-user" },
-    ];
-    return { sidebar: all, bottom: all.slice(0, 4), more: all.slice(4) };
-  }
-
-  if (role === "provider") {
-    const all = [
-      ...userTabs.slice(0, 4),
-      { id: "admin_content", label: t("nav.admin_content"), icon: "bx-slider-alt" },
-      ...userTabs.slice(4),
-    ];
-    return { sidebar: all, bottom: all.slice(0, 4), more: all.slice(4) };
-  }
-
   return { sidebar: userTabs, bottom: userTabs.slice(0, 4), more: userTabs.slice(4) };
 }

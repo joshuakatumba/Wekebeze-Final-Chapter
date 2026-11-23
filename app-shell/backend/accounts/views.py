@@ -172,3 +172,22 @@ def verify_user(request, pk):
     log_audit(request, "admin.verify_user", "User", user.id)
     return Response(UserProfileSerializer(user).data)
 
+
+@api_view(["PATCH"])
+@permission_classes([IsPlatformAdmin])
+def update_user_role(request, pk):
+    user = User.objects.filter(pk=pk).first()
+    if not user:
+        return Response({"error": "User not found."}, status=status.HTTP_404_NOT_FOUND)
+    if user.pk == request.user.pk:
+        return Response({"error": "Cannot change your own role."}, status=status.HTTP_400_BAD_REQUEST)
+    role = request.data.get("role")
+    valid_roles = {c[0] for c in User.Role.choices}
+    if role not in valid_roles:
+        return Response({"error": f"Invalid role. Must be one of: {', '.join(sorted(valid_roles))}"}, status=status.HTTP_400_BAD_REQUEST)
+    user.role = role
+    user.is_staff = role == User.Role.ADMIN
+    user.save(update_fields=["role", "is_staff"])
+    log_audit(request, "admin.update_role", "User", user.id, {"role": role})
+    return Response(UserProfileSerializer(user).data)
+

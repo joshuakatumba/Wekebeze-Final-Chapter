@@ -18,6 +18,7 @@ export const ENDPOINTS = {
   users: "/accounts/users/",
   toggleUserActive: (id) => `/accounts/users/${id}/toggle-active/`,
   verifyUser: (id) => `/accounts/users/${id}/verify/`,
+  updateUserRole: (id) => `/accounts/users/${id}/role/`,
 
   // Wekebeze Awareness & Guided Chat
   awarenessCategories: "/awareness/categories/",

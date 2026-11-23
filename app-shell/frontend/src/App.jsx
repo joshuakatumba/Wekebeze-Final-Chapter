@@ -13,8 +13,6 @@ import { PageSkeleton } from "./components/ui";
 import LandingPage from "./pages/LandingPage";
 import AuthModal from "./pages/AuthModal";
 import DashboardPage from "./pages/DashboardPage";
-import FilesPage from "./pages/FilesPage";
-import NotificationsPage from "./pages/NotificationsPage";
 import ProfilePage from "./pages/ProfilePage";
 import AdminUsersPage from "./pages/AdminUsersPage";
 import AwarenessPage from "./modules/awareness/AwarenessPage";
@@ -22,7 +20,10 @@ import GuidedChatPage from "./modules/awareness/GuidedChatPage";
 import AiAssistantPage from "./modules/ai/AiAssistantPage";
 import QuizzesPage from "./modules/quizzes/QuizzesPage";
 import ScreeningPage from "./modules/screening/ScreeningPage";
-import AdminContentPage from "./modules/admin/AdminContentPage";
+import AdminDashboardPage from "./modules/admin/AdminDashboardPage";
+import AdminLearningPage from "./modules/admin/AdminLearningPage";
+import AdminKnowledgePage from "./modules/admin/AdminKnowledgePage";
+import AdminCentersPage from "./modules/admin/AdminCentersPage";
 
 export default function App() {
   const { user, loading } = useAuth();
@@ -36,6 +37,11 @@ export default function App() {
     api.get(ENDPOINTS.config).then((res) => setSiteFlags(res?.settings_json || {})).catch(() => {});
   }, []);
 
+  // Reset active tab when user role changes
+  useEffect(() => {
+    setTab("dashboard");
+  }, [user?.id]);
+
   if (loading) {
     return (
       <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh" }}>
@@ -44,11 +50,11 @@ export default function App() {
     );
   }
 
-  const rawNav = getNavigation(user?.role || "user", t);
   const isAdmin = user?.role === "admin";
-  const canManageContent = user?.role === "admin" || user?.role === "provider";
+  const isEducator = user?.role === "provider";
+  const canManageContent = isAdmin || isEducator;
+  const rawNav = getNavigation(user?.role || "user", t);
 
-  // Filter navigation items dynamically by admin-controlled visibility flags (admins always see all)
   const isVisible = (id) => {
     if (isAdmin) return true;
     if (id === "awareness" && siteFlags.show_awareness === false) return false;
@@ -70,6 +76,14 @@ export default function App() {
       <AppShell nav={nav} activeTab={tab} onTabChange={setTab} onOpenAuth={setAuthMode}>
         {!user ? (
           <LandingPage onOpenAuth={setAuthMode} />
+        ) : isAdmin ? (
+          <Suspense fallback={<PageSkeleton />}>
+            {tab === "dashboard" && <AdminDashboardPage onNavigate={setTab} />}
+            {tab === "users" && <AdminUsersPage />}
+            {tab === "content" && <AdminLearningPage />}
+            {tab === "knowledge" && <AdminKnowledgePage />}
+            {tab === "centers" && <AdminCentersPage />}
+          </Suspense>
         ) : (
           <Suspense fallback={<PageSkeleton />}>
             {tab === "dashboard" && <DashboardPage onNavigate={setTab} />}
@@ -78,11 +92,9 @@ export default function App() {
             {tab === "guided_chat" && <GuidedChatPage onNavigate={setTab} />}
             {tab === "quizzes" && <QuizzesPage />}
             {tab === "screening" && <ScreeningPage />}
-            {tab === "admin_content" && canManageContent && <AdminContentPage />}
-            {tab === "files" && <FilesPage />}
-            {tab === "notifications" && <NotificationsPage />}
+            {tab === "content" && canManageContent && <AdminLearningPage />}
+            {tab === "knowledge" && canManageContent && <AdminKnowledgePage />}
             {tab === "profile" && <ProfilePage />}
-            {tab === "users" && isAdmin && <AdminUsersPage />}
           </Suspense>
         )}
       </AppShell>

@@ -24,3 +24,4 @@ docker compose -p wekebeze up -d --build
 2. In the Render Dashboard, choose **New → Blueprint** and select your GitHub repository.
 3. Render automatically provisions `wekebeze-db`, `wekebeze-api`, and `wekebeze-web` from `render.yaml`.
 4. (Optional) Add your `LLM_API_KEY` in the `wekebeze-api` environment variables on Render.
+

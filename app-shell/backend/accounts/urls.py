@@ -13,5 +13,6 @@ urlpatterns = [
     path("users/", views.AdminUserListView.as_view(), name="admin-users"),
     path("users/<int:pk>/toggle-active/", views.toggle_user_active, name="toggle-active"),
     path("users/<int:pk>/verify/", views.verify_user, name="verify-user"),
+    path("users/<int:pk>/role/", views.update_user_role, name="update-role"),
 ]
 
