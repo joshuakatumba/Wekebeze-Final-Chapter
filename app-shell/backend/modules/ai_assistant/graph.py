@@ -1,7 +1,7 @@
-"""LangGraph-powered conversation workflow with LangChain LLM integration and grounded fallback."""
-import os
+"""LangGraph-powered conversation workflow with multi-provider LLM support and grounded RAG fallback."""
 from typing import Any, TypedDict
 
+from .llm import generate_llm_reply
 from .rag import retrieve_approved_chunks
 from .safety import detect_urgent_symptoms, ensure_safety_footer, urgent_escalation_message
 
@@ -64,16 +64,16 @@ def retrieve_knowledge_node(state: ChatState) -> ChatState:
 
 
 def _call_configured_llm(user_message: str, language: str, history: list[dict], chunks: list[dict]) -> str | None:
-    """Use LangChain LLM when LLM_API_KEY is configured in environment."""
-    api_key = os.environ.get("LLM_API_KEY", "").strip()
-    if not api_key:
-        return None
-    model_name = os.environ.get("LLM_MODEL", "gpt-4o-mini").strip()
+    """Invoke any configured LLM provider (OpenAI, Gemini, Claude, Groq, OpenRouter, DeepSeek, Ollama, Custom)."""
     context_text = "\n\n".join(
         f"[{c['title']} — {c['source']}]\n{c['content']}" for c in chunks
     ) or "No specific approved knowledge base passage matched."
 
-    lang_instruction = "Respond clearly and empathetically in Luganda." if language == "lg" else "Respond clearly, empathetically, and concisely in English."
+    lang_instruction = (
+        "Respond clearly and empathetically in Luganda."
+        if language == "lg"
+        else "Respond clearly, empathetically, and concisely in English."
+    )
     system_prompt = (
         "You are Wekebeze, a trusted cancer-awareness educational assistant for communities in Uganda. "
         "Answer questions about breast cancer, cervical cancer, prevention, HPV vaccination, symptoms, and screening. "
@@ -81,23 +81,7 @@ def _call_configured_llm(user_message: str, language: str, history: list[dict], 
         "If reliable information is unavailable in the context, state that honestly and recommend consulting a healthcare professional. "
         f"{lang_instruction}\n\nVerified Context:\n{context_text}"
     )
-
-    try:
-        from langchain_openai import ChatOpenAI
-        from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
-
-        llm = ChatOpenAI(api_key=api_key, model=model_name, temperature=0.2, timeout=30)
-        msgs = [SystemMessage(content=system_prompt)]
-        for h in (history or [])[-6:]:
-            if h.get("role") == "user":
-                msgs.append(HumanMessage(content=h["content"]))
-            elif h.get("role") == "assistant":
-                msgs.append(AIMessage(content=h["content"]))
-        msgs.append(HumanMessage(content=user_message))
-        result = llm.invoke(msgs)
-        return getattr(result, "content", str(result))
-    except Exception:
-        return None
+    return generate_llm_reply(system_prompt, history, user_message)
 
 
 def generate_response_node(state: ChatState) -> ChatState:

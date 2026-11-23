@@ -214,3 +214,27 @@ class WekebezePlatformTests(TestCase):
             t.join()
         self.assertFalse(state["overlap"])
 
+    def test_multi_provider_llm_resolution(self):
+        import os
+        from unittest.mock import patch
+        from modules.ai_assistant.llm import resolve_llm_config
+
+        with patch.dict(os.environ, {"LLM_PROVIDER": "", "LLM_MODEL": "gemini-2.5-flash", "LLM_BASE_URL": ""}, clear=False):
+            cfg = resolve_llm_config()
+            self.assertEqual(cfg["provider"], "gemini")
+            self.assertIn("generativelanguage.googleapis.com", cfg["base_url"])
+
+        with patch.dict(os.environ, {"LLM_PROVIDER": "", "LLM_MODEL": "claude-3-5-haiku-latest", "LLM_BASE_URL": ""}, clear=False):
+            cfg = resolve_llm_config()
+            self.assertEqual(cfg["provider"], "anthropic")
+
+        with patch.dict(os.environ, {"LLM_PROVIDER": "groq", "LLM_MODEL": "", "LLM_BASE_URL": ""}, clear=False):
+            cfg = resolve_llm_config()
+            self.assertEqual(cfg["provider"], "groq")
+            self.assertIn("api.groq.com", cfg["base_url"])
+
+        with patch.dict(os.environ, {"LLM_PROVIDER": "ollama", "LLM_MODEL": "llama3.2", "LLM_BASE_URL": ""}, clear=False):
+            cfg = resolve_llm_config()
+            self.assertEqual(cfg["provider"], "ollama")
+            self.assertEqual(cfg["model"], "llama3.2")
+
