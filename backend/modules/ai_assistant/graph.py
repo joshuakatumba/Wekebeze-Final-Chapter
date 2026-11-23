@@ -75,10 +75,12 @@ def _call_configured_llm(user_message: str, language: str, history: list[dict], 
         else "Respond clearly, empathetically, and concisely in English."
     )
     system_prompt = (
-        "You are Wekebeze, a trusted cancer-awareness educational assistant for communities in Uganda. "
+        "You are Wekebeze, a trusted, warm cancer-awareness educational assistant for communities in Uganda. "
         "Answer questions about breast cancer, cervical cancer, prevention, HPV vaccination, symptoms, and screening. "
         "Ground your response in the verified context below. Never diagnose cancer or prescribe treatment. "
-        "If reliable information is unavailable in the context, state that honestly and recommend consulting a healthcare professional. "
+        "Format answers cleanly with short headings and concise bullet points so they read effortlessly on mobile phones. "
+        "Do NOT repeat boilerplate medical warnings or disclaimers at the end of every answer — keep your tone helpful, calm, and direct, "
+        "and only suggest seeing a clinician when directly relevant to the user's question. "
         f"{lang_instruction}\n\nVerified Context:\n{context_text}"
     )
     return generate_llm_reply(system_prompt, history, user_message)

@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Plus, Send, Trash2, AlertTriangle, History, X, ThumbsUp, ThumbsDown } from "lucide-react";
+import { Plus, Send, Trash2, AlertTriangle, History, X, ThumbsUp, ThumbsDown, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "../../api/client";
 import { ENDPOINTS } from "../../api/endpoints";
@@ -20,11 +20,11 @@ function renderInline(text) {
     if (m.index > last) tokens.push(text.slice(last, m.index));
     const tok = m[0];
     if (tok.startsWith("**")) {
-      tokens.push(<strong key={key++} style={{ fontWeight: 600, color: "var(--text-primary)" }}>{tok.slice(2, -2)}</strong>);
+      tokens.push(<strong key={key++}>{tok.slice(2, -2)}</strong>);
     } else if (tok.startsWith("*")) {
       tokens.push(<em key={key++} style={{ color: "var(--text-secondary)" }}>{tok.slice(1, -1)}</em>);
     } else if (tok.startsWith("`")) {
-      tokens.push(<code key={key++} style={{ background: "var(--surface-muted)", padding: "1px 5px", borderRadius: 5, fontSize: "0.9em" }}>{tok.slice(1, -1)}</code>);
+      tokens.push(<code key={key++}>{tok.slice(1, -1)}</code>);
     }
     last = regex.lastIndex;
   }
@@ -32,20 +32,23 @@ function renderInline(text) {
   return tokens;
 }
 
-/** Structured Markdown message formatter (headings, bullet/numbered lists, paragraphs, dividers) */
-function FormattedMessage({ content }) {
+/** Structured Markdown message formatter with mobile-safe tables and Claude-style streaming fade-in */
+function FormattedMessage({ content, isStreaming = false }) {
   const lines = String(content || "").split("\n");
   const blocks = [];
   let listItems = [];
   let listType = null;
+  let tableRows = [];
+
+  const cls = isStreaming ? "ai-stream-block" : undefined;
 
   const flushList = () => {
     if (!listItems.length) return;
     const Tag = listType === "ol" ? "ol" : "ul";
     blocks.push(
-      <Tag key={`l-${blocks.length}`} style={{ margin: "6px 0 10px", paddingLeft: 20, display: "flex", flexDirection: "column", gap: 5 }}>
+      <Tag key={`l-${blocks.length}`} className={cls}>
         {listItems.map((item, i) => (
-          <li key={i} style={{ lineHeight: 1.55 }}>{renderInline(item)}</li>
+          <li key={i} className={cls}>{renderInline(item)}</li>
         ))}
       </Tag>
     );
@@ -53,32 +56,66 @@ function FormattedMessage({ content }) {
     listType = null;
   };
 
+  const flushTable = () => {
+    if (!tableRows.length) return;
+    const parsed = tableRows
+      .filter((r) => !/^\|?[\s:-]+\|?$/.test(r.replace(/\|/g, "")))
+      .map((r) => r.replace(/^\||\|$/g, "").split("|").map((c) => c.trim()));
+    if (parsed.length > 0) {
+      const [head, ...body] = parsed;
+      blocks.push(
+        <div key={`t-${blocks.length}`} className={`ai-table-wrap ${cls || ""}`}>
+          <table className="ai-table">
+            <thead>
+              <tr>{head.map((c, i) => <th key={i}>{renderInline(c)}</th>)}</tr>
+            </thead>
+            {body.length > 0 && (
+              <tbody>
+                {body.map((row, ri) => (
+                  <tr key={ri}>{row.map((c, ci) => <td key={ci}>{renderInline(c)}</td>)}</tr>
+                ))}
+              </tbody>
+            )}
+          </table>
+        </div>
+      );
+    }
+    tableRows = [];
+  };
+
   lines.forEach((rawLine, idx) => {
     const line = rawLine.trim();
     if (!line) {
       flushList();
+      flushTable();
       return;
     }
+    if (line.startsWith("|") && line.endsWith("|")) {
+      flushList();
+      tableRows.push(line);
+      return;
+    }
+    flushTable();
+
     if (/^-{3,}$/.test(line)) {
       flushList();
-      blocks.push(<hr key={`hr-${idx}`} style={{ border: "none", borderTop: "1px solid var(--border-subtle)", margin: "12px 0" }} />);
+      blocks.push(<hr key={`hr-${idx}`} className={cls} />);
       return;
     }
     const headingMatch = line.match(/^#{1,4}\s+(.+)$/);
     if (headingMatch) {
       flushList();
       blocks.push(
-        <h4 key={`h-${idx}`} style={{ margin: "12px 0 6px", fontSize: 15, fontWeight: 600, color: "var(--text-primary)" }}>
+        <h4 key={`h-${idx}`} className={cls}>
           {renderInline(headingMatch[1])}
         </h4>
       );
       return;
     }
-    // Standalone bold line treated as a clean section heading
     if (/^\*\*[^*]+\*\*$/.test(line)) {
       flushList();
       blocks.push(
-        <h4 key={`bh-${idx}`} style={{ margin: blocks.length ? "14px 0 6px" : "0 0 6px", fontSize: 15, fontWeight: 600, color: "var(--text-primary)" }}>
+        <h4 key={`bh-${idx}`} className={cls}>
           {line.slice(2, -2)}
         </h4>
       );
@@ -100,14 +137,34 @@ function FormattedMessage({ content }) {
     }
     flushList();
     blocks.push(
-      <p key={`p-${idx}`} style={{ margin: "6px 0", lineHeight: 1.62 }}>
+      <p key={`p-${idx}`} className={cls}>
         {renderInline(line)}
       </p>
     );
   });
   flushList();
+  flushTable();
 
-  return <div style={{ fontSize: 14 }}>{blocks}</div>;
+  return (
+    <div className="ai-prose">
+      {blocks}
+      {isStreaming && <span className="ai-stream-cursor" aria-hidden="true" />}
+    </div>
+  );
+}
+
+/** Claude-style breathing orb + shimmer thinking indicator */
+function ThinkingIndicator({ lang }) {
+  return (
+    <div className="ai-thinking" role="status" aria-live="polite">
+      <span className="ai-think-orb" aria-hidden="true">
+        <Sparkles size={12} />
+      </span>
+      <span className="ai-think-text">
+        {lang === "lg" ? "Aliko alowooza..." : "Thinking..."}
+      </span>
+    </div>
+  );
 }
 
 export default function AiAssistantPage() {
@@ -155,7 +212,7 @@ export default function AiAssistantPage() {
   };
 
   useEffect(() => { loadConversations(); }, []);
-  useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, streamDraft]);
+  useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, streamDraft, streaming]);
 
   const createConversation = async () => {
     try {
@@ -270,100 +327,96 @@ export default function AiAssistantPage() {
       </div>
 
       <div className="chat-sticky-body">
-        {messages.length === 0 && !streamDraft ? (
-          <div style={{ margin: "auto", textAlign: "center", maxWidth: 340 }}>
-            <h3 style={{ margin: "0 0 14px", fontSize: 18, fontWeight: 500, color: "var(--text-secondary)" }}>
-              {lang === "lg" ? "Nnyinza kukuyamba ntya?" : "How can I help?"}
-            </h3>
-            <div className="row" style={{ justifyContent: "center", gap: 8 }}>
-              {quickPrompts.map((p) => (
-                <button
-                  key={p}
-                  type="button"
-                  onClick={() => setInput(p)}
-                  style={{
-                    padding: "8px 14px", borderRadius: 9999, border: "1px solid var(--border-subtle)",
-                    background: "#ffffff", color: "var(--text-primary)", fontSize: 13, cursor: "pointer",
-                  }}
-                >
-                  {p}
-                </button>
-              ))}
-            </div>
-          </div>
-        ) : (
-          <>
-            {messages.map((m) => {
-              const isUser = m.role === "user";
-              const isUrgent = m.metadata?.is_urgent;
-              return (
-                <div
-                  key={m.id}
-                  style={{
-                    alignSelf: isUser ? "flex-end" : "flex-start",
-                    maxWidth: isUser ? "80%" : "88%",
-                    background: isUser ? "var(--color-lime-voltage)" : isUrgent ? "#fff1f2" : "#ffffff",
-                    color: isUser ? "#fff" : isUrgent ? "#881337" : "var(--text-primary)",
-                    padding: isUser ? "10px 15px" : "14px 18px",
-                    borderRadius: isUser ? "18px 18px 4px 18px" : "4px 18px 18px 18px",
-                    boxShadow: isUser ? "none" : "0 1px 4px rgba(0,0,0,0.04)",
-                    fontSize: 14,
-                  }}
-                >
-                  {isUrgent && (
-                    <div className="row" style={{ gap: 6, marginBottom: 8, color: "#e11d48", fontSize: 12, fontWeight: 600 }}>
-                      <AlertTriangle size={14} /> Urgent Medical Guidance
-                    </div>
-                  )}
-                  {isUser ? (
-                    <div style={{ whiteSpace: "pre-wrap", lineHeight: 1.5 }}>{m.content}</div>
-                  ) : (
-                    <FormattedMessage content={m.content} />
-                  )}
-                  {!isUser && Array.isArray(m.sources) && m.sources.length > 0 && (
-                    <div style={{ marginTop: 10, paddingTop: 8, borderTop: "1px solid var(--border-subtle)" }} className="row">
-                      {m.sources.map((s, si) => <Badge key={si} tone="success">{s.title}</Badge>)}
-                    </div>
-                  )}
-                  {!isUser && !String(m.id).startsWith("tmp-") && (
-                    <div className="row" style={{ gap: 6, marginTop: 8 }}>
-                      <button
-                        type="button"
-                        onClick={() => rateMessage(m.id, 1)}
-                        aria-label="Helpful"
-                        style={{
-                          background: ratings[m.id] === 1 ? "var(--color-teal-soft)" : "transparent",
-                          color: ratings[m.id] === 1 ? "var(--color-teal-dark)" : "var(--color-pebble)",
-                          border: "none", borderRadius: 8, padding: 4, cursor: "pointer", display: "inline-flex",
-                        }}
-                      >
-                        <ThumbsUp size={13} />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => rateMessage(m.id, -1)}
-                        aria-label="Not helpful"
-                        style={{
-                          background: ratings[m.id] === -1 ? "var(--color-linen-mist)" : "transparent",
-                          color: ratings[m.id] === -1 ? "var(--color-rose-600)" : "var(--color-pebble)",
-                          border: "none", borderRadius: 8, padding: 4, cursor: "pointer", display: "inline-flex",
-                        }}
-                      >
-                        <ThumbsDown size={13} />
-                      </button>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-            {streamDraft && (
-              <div style={{ alignSelf: "flex-start", maxWidth: "88%", background: "#ffffff", padding: "14px 18px", borderRadius: "4px 18px 18px 18px", boxShadow: "0 1px 4px rgba(0,0,0,0.04)" }}>
-                <FormattedMessage content={streamDraft} />
+        <div className="chat-sticky-inner">
+          {messages.length === 0 && !streaming && !streamDraft ? (
+            <div style={{ margin: "auto", textAlign: "center", maxWidth: 340, padding: "0 8px" }}>
+              <h3 style={{ margin: "0 0 14px", fontSize: 18, fontWeight: 500, color: "var(--text-secondary)" }}>
+                {lang === "lg" ? "Nnyinza kukuyamba ntya?" : "How can I help?"}
+              </h3>
+              <div className="row" style={{ justifyContent: "center", gap: 8 }}>
+                {quickPrompts.map((p) => (
+                  <button
+                    key={p}
+                    type="button"
+                    onClick={() => setInput(p)}
+                    style={{
+                      padding: "8px 14px", borderRadius: 9999, border: "1px solid var(--border-subtle)",
+                      background: "#ffffff", color: "var(--text-primary)", fontSize: 13, cursor: "pointer",
+                    }}
+                  >
+                    {p}
+                  </button>
+                ))}
               </div>
-            )}
-            <div ref={endRef} />
-          </>
-        )}
+            </div>
+          ) : (
+            <>
+              {messages.map((m) => {
+                const isUser = m.role === "user";
+                const isUrgent = Boolean(m.metadata?.is_urgent);
+                if (isUser) {
+                  return (
+                    <div key={m.id} className="ai-user-bubble">
+                      {m.content}
+                    </div>
+                  );
+                }
+                return (
+                  <div key={m.id} className={`ai-msg-bubble ${isUrgent ? "urgent" : ""}`}>
+                    {isUrgent && (
+                      <div className="row" style={{ gap: 6, marginBottom: 8, color: "#e11d48", fontSize: 12, fontWeight: 600 }}>
+                        <AlertTriangle size={14} /> Urgent Medical Guidance
+                      </div>
+                    )}
+                    <FormattedMessage content={m.content} />
+                    {Array.isArray(m.sources) && m.sources.length > 0 && (
+                      <div className="ai-sources">
+                        {m.sources.map((s, si) => <Badge key={si} tone="success">{s.title}</Badge>)}
+                      </div>
+                    )}
+                    {!String(m.id).startsWith("tmp-") && (
+                      <div className="row" style={{ gap: 6, marginTop: 8 }}>
+                        <button
+                          type="button"
+                          onClick={() => rateMessage(m.id, 1)}
+                          aria-label="Helpful"
+                          style={{
+                            background: ratings[m.id] === 1 ? "var(--color-teal-soft)" : "transparent",
+                            color: ratings[m.id] === 1 ? "var(--color-teal-dark)" : "var(--color-pebble)",
+                            border: "none", borderRadius: 8, padding: 4, cursor: "pointer", display: "inline-flex",
+                          }}
+                        >
+                          <ThumbsUp size={13} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => rateMessage(m.id, -1)}
+                          aria-label="Not helpful"
+                          style={{
+                            background: ratings[m.id] === -1 ? "var(--color-linen-mist)" : "transparent",
+                            color: ratings[m.id] === -1 ? "var(--color-rose-600)" : "var(--color-pebble)",
+                            border: "none", borderRadius: 8, padding: 4, cursor: "pointer", display: "inline-flex",
+                          }}
+                        >
+                          <ThumbsDown size={13} />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+
+              {streaming && !streamDraft && <ThinkingIndicator lang={lang} />}
+
+              {streamDraft && (
+                <div className="ai-msg-bubble">
+                  <FormattedMessage content={streamDraft} isStreaming />
+                </div>
+              )}
+              <div ref={endRef} />
+            </>
+          )}
+        </div>
       </div>
 
       <form onSubmit={sendMessage} className="chat-sticky-bar">

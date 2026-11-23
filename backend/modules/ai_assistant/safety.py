@@ -31,20 +31,16 @@ def urgent_escalation_message(language: str = "en") -> str:
             "obulumi obungi ennyo, oba okuzibuwalirwa okussa) bwetaaga obujjanjabi obw'amangu.\n\n"
             "Bambi genda amangu mu ddwaliro erisinga okuba okumpi naawe oba ku **Uganda Cancer Institute (Mulago)** "
             "oba kuba ku nnamba y'obuyambi ey'amangu. Tolinda."
-            + DISCLAIMER_LG
         )
     return (
         "**Urgent Medical Guidance:** The symptoms you described (such as heavy bleeding, fainting, "
         "severe pain, or difficulty breathing) require **prompt professional medical attention**.\n\n"
         "Please visit the nearest hospital, emergency department, or the **Uganda Cancer Institute (Mulago)** "
         "as soon as possible. Do not wait."
-        + DISCLAIMER_EN
     )
 
 
 def ensure_safety_footer(response_text: str, language: str = "en") -> str:
-    text = (response_text or "").strip()
-    if "does not diagnose" in text.lower() or "tekebeza kookolo" in text.lower():
-        return text
-    return text + (DISCLAIMER_LG if language == "lg" else DISCLAIMER_EN)
+    """Return clean assistant response without cluttering every reply with repetitive warning banners."""
+    return (response_text or "").strip()
 
