@@ -185,6 +185,24 @@ def guided_progress_view(request):
 
 
 @api_view(["GET"])
+@permission_classes([has_role("admin", "provider")])
+def educator_stats_view(request):
+    """Content-only overview for Health Educators (zero private user or system data)."""
+    from modules.quizzes.models import Quiz
+    from modules.ai_assistant.models import KnowledgeDocument
+
+    return Response({
+        "articles": AwarenessArticle.objects.count(),
+        "published_articles": AwarenessArticle.objects.filter(status=PublishStatus.PUBLISHED).count(),
+        "guided_nodes": GuidedChatNode.objects.count(),
+        "quizzes": Quiz.objects.count(),
+        "knowledge_docs": KnowledgeDocument.objects.count(),
+        "approved_docs": KnowledgeDocument.objects.filter(review_status="approved").count(),
+        "draft_docs": KnowledgeDocument.objects.filter(review_status="draft").count(),
+    })
+
+
+@api_view(["GET"])
 @permission_classes([IsPlatformAdmin])
 def platform_analytics_view(request):
     """Aggregated platform analytics for Administrators (never exposes private conversation content)."""

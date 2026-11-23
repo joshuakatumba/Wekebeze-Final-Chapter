@@ -2,6 +2,8 @@
 import math
 import re
 from collections import Counter
+from django.db import transaction
+from core.concurrency import rw_lock
 from .models import KnowledgeChunk, KnowledgeDocument
 
 STOPWORDS = {
@@ -41,8 +43,7 @@ def chunk_text(text: str, max_chars: int = 700, overlap: int = 100) -> list[str]
 
 
 def ingest_document(document: KnowledgeDocument) -> int:
-    """Split document into chunks and store term-frequency metadata for fast retrieval."""
-    document.chunks.all().delete()
+    """Split document into chunks under an exclusive write lock + DB transaction so readers never see partial chunks."""
     pieces = chunk_text(document.content)
     objs = []
     for idx, piece in enumerate(pieces):
@@ -62,7 +63,10 @@ def ingest_document(document: KnowledgeDocument) -> int:
                 },
             )
         )
-    KnowledgeChunk.objects.bulk_create(objs)
+    with rw_lock("rag:knowledge", mode="write", ttl_seconds=25):
+        with transaction.atomic():
+            document.chunks.all().delete()
+            KnowledgeChunk.objects.bulk_create(objs)
     return len(objs)
 
 
@@ -81,13 +85,16 @@ def _cosine_dict(a: dict[str, int], b: dict[str, int]) -> float:
 
 
 def retrieve_approved_chunks(query: str, language: str = "en", top_k: int = 4) -> list[dict]:
-    """Retrieve top-k chunks ONLY from approved KnowledgeDocuments."""
+    """Retrieve top-k chunks ONLY from approved KnowledgeDocuments under a shared read lock."""
     q_terms = dict(Counter(tokenize(query)))
-    qs = KnowledgeChunk.objects.select_related("document").filter(
-        document__review_status=KnowledgeDocument.ReviewStatus.APPROVED
-    )
+    with rw_lock("rag:knowledge", mode="read", ttl_seconds=15):
+        chunks_snapshot = list(
+            KnowledgeChunk.objects.select_related("document").filter(
+                document__review_status=KnowledgeDocument.ReviewStatus.APPROVED
+            )
+        )
     scored = []
-    for chunk in qs:
+    for chunk in chunks_snapshot:
         c_terms = (chunk.metadata or {}).get("terms") or dict(Counter(tokenize(chunk.content)))
         title_terms = dict(Counter(tokenize(chunk.document.title)))
         score = _cosine_dict(q_terms, c_terms) + 0.35 * _cosine_dict(q_terms, title_terms)

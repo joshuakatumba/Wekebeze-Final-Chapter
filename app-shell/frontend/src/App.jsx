@@ -24,6 +24,7 @@ import AdminDashboardPage from "./modules/admin/AdminDashboardPage";
 import AdminLearningPage from "./modules/admin/AdminLearningPage";
 import AdminKnowledgePage from "./modules/admin/AdminKnowledgePage";
 import AdminCentersPage from "./modules/admin/AdminCentersPage";
+import EducatorDashboardPage from "./modules/educator/EducatorDashboardPage";
 
 export default function App() {
   const { user, loading } = useAuth();
@@ -84,6 +85,13 @@ export default function App() {
             {tab === "knowledge" && <AdminKnowledgePage />}
             {tab === "centers" && <AdminCentersPage />}
           </Suspense>
+        ) : isEducator ? (
+          <Suspense fallback={<PageSkeleton />}>
+            {tab === "dashboard" && <EducatorDashboardPage onNavigate={setTab} />}
+            {tab === "content" && <AdminLearningPage />}
+            {tab === "knowledge" && <AdminKnowledgePage />}
+            {tab === "ai_chat" && <AiAssistantPage />}
+          </Suspense>
         ) : (
           <Suspense fallback={<PageSkeleton />}>
             {tab === "dashboard" && <DashboardPage onNavigate={setTab} />}
@@ -92,8 +100,6 @@ export default function App() {
             {tab === "guided_chat" && <GuidedChatPage onNavigate={setTab} />}
             {tab === "quizzes" && <QuizzesPage />}
             {tab === "screening" && <ScreeningPage />}
-            {tab === "content" && canManageContent && <AdminLearningPage />}
-            {tab === "knowledge" && canManageContent && <AdminKnowledgePage />}
             {tab === "profile" && <ProfilePage />}
           </Suspense>
         )}

@@ -4,6 +4,7 @@ from .views import (
     AwarenessArticleViewSet,
     AwarenessCategoryViewSet,
     GuidedChatNodeViewSet,
+    educator_stats_view,
     guided_progress_view,
     platform_analytics_view,
 )
@@ -15,6 +16,7 @@ router.register("guided-nodes", GuidedChatNodeViewSet, basename="guided-node")
 
 urlpatterns = [
     path("progress/", guided_progress_view, name="guided-progress"),
+    path("educator-stats/", educator_stats_view, name="educator-stats"),
     path("analytics/", platform_analytics_view, name="platform-analytics"),
     path("", include(router.urls)),
 ]

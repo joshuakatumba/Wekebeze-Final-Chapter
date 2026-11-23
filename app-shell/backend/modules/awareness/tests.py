@@ -154,3 +154,63 @@ class WekebezePlatformTests(TestCase):
         self.assertEqual(upd.status_code, 200)
         self.assertFalse(upd.data["settings_json"]["show_quizzes"])
 
+    def test_educator_strict_rbac_and_rw_lock(self):
+        import threading
+        import time
+        from core.concurrency import rw_lock
+
+        educator = User.objects.get(email="educator@wekebeze.org")
+        self.client.force_authenticate(user=educator)
+
+        # Educator CAN access their own stats and AI knowledge base
+        self.assertEqual(self.client.get("/api/v1/awareness/educator-stats/").status_code, 200)
+        self.assertEqual(self.client.get("/api/v1/ai/knowledge/").status_code, 200)
+
+        # Educator CANNOT access Admin-only endpoints
+        self.assertEqual(self.client.get("/api/v1/accounts/users/").status_code, 403)
+        self.assertEqual(self.client.get("/api/v1/awareness/analytics/").status_code, 403)
+        self.assertEqual(self.client.get("/api/v1/core/audit-logs/").status_code, 403)
+        self.assertEqual(
+            self.client.patch("/api/v1/core/config/", {"settings_json": {"hero_title": "Hack"}}, format="json").status_code,
+            403,
+        )
+        self.assertEqual(
+            self.client.post(
+                "/api/v1/screening/centers/",
+                {"name": "Unauthorized Center", "district": "Kampala", "location": "Test"},
+                format="json",
+            ).status_code,
+            403,
+        )
+
+        # Verify rw_lock prevents reader/writer overlap
+        state = {"readers": 0, "writers": 0, "overlap": False}
+        guard = threading.Lock()
+
+        def reader():
+            with rw_lock("test:rw", mode="read"):
+                with guard:
+                    state["readers"] += 1
+                    if state["writers"] > 0:
+                        state["overlap"] = True
+                time.sleep(0.015)
+                with guard:
+                    state["readers"] -= 1
+
+        def writer():
+            with rw_lock("test:rw", mode="write"):
+                with guard:
+                    state["writers"] += 1
+                    if state["readers"] > 0 or state["writers"] > 1:
+                        state["overlap"] = True
+                time.sleep(0.015)
+                with guard:
+                    state["writers"] -= 1
+
+        threads = [threading.Thread(target=reader) for _ in range(4)] + [threading.Thread(target=writer) for _ in range(2)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+        self.assertFalse(state["overlap"])
+

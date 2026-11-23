@@ -28,6 +28,7 @@ export const ENDPOINTS = {
   guidedNode: (id) => `/awareness/guided-nodes/${id}/`,
   guidedFlow: (cancerType, lang) => `/awareness/guided-nodes/flow/?cancer_type=${cancerType}&language=${lang}`,
   guidedProgress: "/awareness/progress/",
+  educatorStats: "/awareness/educator-stats/",
   analytics: "/awareness/analytics/",
 
   // Wekebeze Quizzes

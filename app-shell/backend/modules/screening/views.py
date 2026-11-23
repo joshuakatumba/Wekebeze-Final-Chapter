@@ -4,7 +4,8 @@ from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
-from core.permissions import has_role
+from core.concurrency import rw_lock
+from core.permissions import IsPlatformAdmin
 from core.services import log_audit
 from .models import ScreeningCenter
 from .serializers import ScreeningCenterSerializer
@@ -26,7 +27,27 @@ class ScreeningCenterViewSet(viewsets.ModelViewSet):
     def get_permissions(self):
         if self.action in ("list", "retrieve", "districts", "nearby"):
             return [permissions.AllowAny()]
-        return [has_role("admin", "provider")()]
+        # Strictly Admin-only for screening center mutations (Educators cannot modify centers)
+        return [IsPlatformAdmin()]
+
+    def list(self, request, *args, **kwargs):
+        with rw_lock("screening:centers", mode="read"):
+            return super().list(request, *args, **kwargs)
+
+    def perform_create(self, serializer):
+        with rw_lock("screening:centers", mode="write"):
+            obj = serializer.save(verified_at=timezone.now() if serializer.validated_data.get("is_verified", True) else None)
+            log_audit(self.request, "screening.center.create", "ScreeningCenter", obj.id, {"name": obj.name})
+
+    def perform_update(self, serializer):
+        with rw_lock("screening:centers", mode="write"):
+            obj = serializer.save()
+            log_audit(self.request, "screening.center.update", "ScreeningCenter", obj.id, {"name": obj.name})
+
+    def perform_destroy(self, instance):
+        with rw_lock("screening:centers", mode="write"):
+            log_audit(self.request, "screening.center.delete", "ScreeningCenter", instance.id, {"name": instance.name})
+            instance.delete()
 
     def get_queryset(self):
         qs = ScreeningCenter.objects.prefetch_related("services").all()
@@ -68,16 +89,4 @@ class ScreeningCenterViewSet(viewsets.ModelViewSet):
                 results.append(center)
         results.sort(key=lambda c: c.distance_km)
         return Response(ScreeningCenterSerializer(results, many=True).data)
-
-    def perform_create(self, serializer):
-        obj = serializer.save(verified_at=timezone.now() if serializer.validated_data.get("is_verified", True) else None)
-        log_audit(self.request, "screening.center.create", "ScreeningCenter", obj.id, {"name": obj.name})
-
-    def perform_update(self, serializer):
-        obj = serializer.save()
-        log_audit(self.request, "screening.center.update", "ScreeningCenter", obj.id, {"name": obj.name})
-
-    def perform_destroy(self, instance):
-        log_audit(self.request, "screening.center.delete", "ScreeningCenter", instance.id, {"name": instance.name})
-        instance.delete()
 

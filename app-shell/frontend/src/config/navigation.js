@@ -14,17 +14,15 @@ export function getNavigation(role, t) {
     return { sidebar: adminTabs, bottom: adminTabs.slice(0, 4), more: adminTabs.slice(4) };
   }
 
-  // Health Educators: content curation + awareness/AI tools
+  // Strictly 4 focused sections for Health Educators
   if (role === "provider") {
     const eduTabs = [
-      { id: "dashboard", label: t("nav.dashboard"), icon: "bx-home-alt-2" },
+      { id: "dashboard", label: "Overview", icon: "bx-home-alt-2" },
       { id: "content", label: "Content", icon: "bx-book-content" },
       { id: "knowledge", label: "AI Docs", icon: "bx-brain" },
-      { id: "ai_chat", label: t("nav.ai_chat"), icon: "bx-bot" },
-      { id: "awareness", label: t("nav.awareness"), icon: "bx-book-heart" },
-      { id: "profile", label: t("nav.profile"), icon: "bx-user" },
+      { id: "ai_chat", label: "Test AI", icon: "bx-bot" },
     ];
-    return { sidebar: eduTabs, bottom: eduTabs.slice(0, 4), more: eduTabs.slice(4) };
+    return { sidebar: eduTabs, bottom: eduTabs, more: [] };
   }
 
   // Standard Platform Users
