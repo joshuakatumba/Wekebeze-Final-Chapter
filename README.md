@@ -13,7 +13,6 @@ Bilingual (English & Luganda) breast and cervical cancer awareness platform buil
 
 ## Run Locally with Docker
 ```bash
-cd app-shell
 docker compose -p wekebeze up -d --build
 ```
 - **Frontend:** http://localhost:3005

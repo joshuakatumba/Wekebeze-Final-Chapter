@@ -12,7 +12,7 @@ services:
     name: wekebeze-api
     runtime: python
     plan: free
-    rootDir: app-shell/backend
+    rootDir: backend
     buildCommand: pip install -r requirements.txt && python manage.py collectstatic --noinput
     startCommand: python manage.py migrate --noinput && python manage.py seed_wekebeze && gunicorn config.wsgi:application --bind 0.0.0.0:$PORT --workers 2
     healthCheckPath: /api/v1/core/health/
@@ -45,7 +45,7 @@ services:
   - type: web
     name: wekebeze-web
     runtime: static
-    rootDir: app-shell/frontend
+    rootDir: frontend
     buildCommand: npm install && npm run build
     staticPublishPath: dist
     routes:
@@ -59,3 +59,4 @@ services:
         value: "https://wekebeze-api.onrender.com/api/v1"
       - key: VITE_APP_NAME
         value: "Wekebeze"
+
