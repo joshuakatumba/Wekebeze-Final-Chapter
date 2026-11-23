@@ -58,7 +58,7 @@ export function Modal({ title, onClose, footer, children }) {
     <div className="veil" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-h">
-          <h2 style={{ margin: 0, fontSize: 17, fontWeight: 700 }}>{title}</h2>
+          <h2 style={{ margin: 0, fontSize: 17, fontWeight: 600 }}>{title}</h2>
           <button
             type="button"
             onClick={onClose}
