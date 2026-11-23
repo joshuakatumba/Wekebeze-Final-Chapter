@@ -169,3 +169,4 @@ def generate_llm_reply(system_prompt: str, history: list[dict], user_message: st
         return _call_openai_compatible(cfg, system_prompt, msgs)
     except Exception:
         return None
+
