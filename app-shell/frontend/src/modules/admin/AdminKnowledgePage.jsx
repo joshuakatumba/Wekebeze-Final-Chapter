@@ -104,7 +104,8 @@ export default function AdminKnowledgePage() {
 
       <FileUploadBox
         busy={uploading}
-        label="Upload .txt or .md Medical Guideline (Auto-Indexes for AI)"
+        accept=".pdf,.docx,.txt,.md"
+        label="Upload PDF, DOCX, TXT, or MD Document"
         onFile={uploadFile}
       />
 

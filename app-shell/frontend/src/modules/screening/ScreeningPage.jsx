@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { MapPin, Phone, List, Map as MapIcon, Navigation } from "lucide-react";
+import { MapPin, Phone, List, Map as MapIcon, Navigation, Share2, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "../../api/client";
 import { ENDPOINTS } from "../../api/endpoints";
@@ -168,12 +168,34 @@ export default function ScreeningPage() {
             <div className="stack" style={{ gap: 8 }}>
               {(selected.services || []).map((s) => (
                 <div key={s.id} className="between" style={{ padding: "10px 12px", background: "var(--surface-muted)", borderRadius: 10 }}>
-                  <strong style={{ fontSize: 14 }}>{s.name}</strong>
+                  <span style={{ fontSize: 14, fontWeight: 500 }}>{s.name}</span>
                   <Badge tone={Number(s.price) === 0 ? "success" : "default"}>
                     {Number(s.price) === 0 ? t("screening.free") : `UGX ${Number(s.price).toLocaleString()}`}
                   </Badge>
                 </div>
               ))}
+            </div>
+            <div className="row" style={{ gap: 8, paddingTop: 6 }}>
+              <a
+                href={selected.share_url || `https://www.google.com/maps?q=${selected.latitude},${selected.longitude}`}
+                target="_blank"
+                rel="noreferrer"
+                className="btn btn-primary btn-sm"
+                style={{ flex: 1 }}
+              >
+                <ExternalLink size={14} /> Open Pin
+              </a>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  const url = selected.share_url || `https://www.google.com/maps?q=${selected.latitude},${selected.longitude}`;
+                  if (navigator.share) navigator.share({ title: selected.name, url }).catch(() => {});
+                  else if (navigator.clipboard) { navigator.clipboard.writeText(url); toast.success("Location link copied"); }
+                }}
+              >
+                <Share2 size={14} /> Share
+              </Button>
             </div>
           </div>
         </Modal>

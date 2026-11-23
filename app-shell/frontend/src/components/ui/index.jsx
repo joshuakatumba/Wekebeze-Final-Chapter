@@ -1,5 +1,5 @@
-import React from "react";
-import { Loader2, X, Upload } from "lucide-react";
+import React, { useEffect, useRef, useState } from "react";
+import { Loader2, X, Upload, ChevronDown, Check } from "lucide-react";
 
 export function Button({ variant = "primary", size = "md", block = false, loading = false, disabled, children, className = "", ...props }) {
   const cls = [
@@ -96,20 +96,21 @@ export function PageSkeleton() {
   );
 }
 
-export function FileUploadBox({ onFile, busy = false, label = "Upload file" }) {
+export function FileUploadBox({ onFile, busy = false, label = "Upload file", accept }) {
   return (
     <label
       style={{
         display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
-        padding: "18px 16px", border: "1.5px dashed var(--border-subtle)",
+        padding: "16px", border: "1.5px dashed var(--border-subtle)",
         borderRadius: "var(--radius-cards)", cursor: busy ? "not-allowed" : "pointer",
-        background: "var(--surface-card)", fontSize: 14, fontWeight: 600,
+        background: "var(--surface-card)", fontSize: 13.5, fontWeight: 500, textAlign: "center",
       }}
     >
-      {busy ? <Loader2 size={18} className="spin" /> : <Upload size={18} />}
+      {busy ? <Loader2 size={16} className="spin" /> : <Upload size={16} />}
       <span>{label}</span>
       <input
         type="file"
+        accept={accept}
         disabled={busy}
         style={{ display: "none" }}
         onChange={(e) => {
@@ -119,6 +120,50 @@ export function FileUploadBox({ onFile, busy = false, label = "Upload file" }) {
         }}
       />
     </label>
+  );
+}
+
+export function Select({ value, onChange, options = [], placeholder = "Select..." }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    const onDocClick = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+    };
+    document.addEventListener("mousedown", onDocClick);
+    return () => document.removeEventListener("mousedown", onDocClick);
+  }, []);
+
+  const current = options.find((o) => String(o.value) === String(value));
+
+  return (
+    <div ref={ref} className="wk-select">
+      <button type="button" className={`wk-select-trigger ${open ? "open" : ""}`} onClick={() => setOpen((v) => !v)}>
+        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          {current ? current.label : placeholder}
+        </span>
+        <ChevronDown size={14} style={{ flexShrink: 0, transition: "transform 0.15s", transform: open ? "rotate(180deg)" : "none", color: "var(--color-pebble)" }} />
+      </button>
+      {open && (
+        <div className="wk-select-menu">
+          {options.map((opt) => {
+            const active = String(opt.value) === String(value);
+            return (
+              <button
+                key={opt.value}
+                type="button"
+                className={`wk-select-option ${active ? "active" : ""}`}
+                onClick={() => { onChange(opt.value); setOpen(false); }}
+              >
+                <span>{opt.label}</span>
+                {active && <Check size={14} />}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
   );
 }
 

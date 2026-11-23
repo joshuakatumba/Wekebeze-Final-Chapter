@@ -1,8 +1,8 @@
 {
   "nav.dashboard": "Home",
   "nav.awareness": "Awareness",
-  "nav.ai_chat": "AI Assistant",
-  "nav.guided_chat": "Guided Chat",
+  "nav.ai_chat": "Assistant",
+  "nav.guided_chat": "Learn",
   "nav.quizzes": "Quizzes",
   "nav.screening": "Screening",
   "nav.admin_content": "Content Admin",

@@ -170,24 +170,49 @@ class KnowledgeDocumentViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=["post"], url_path="upload")
     def upload(self, request):
-        """Allow admins/educators to upload a .txt/.md medical guideline file into the knowledge base."""
+        """Allow admins/educators to upload full PDF, DOCX, TXT, or MD medical documents into the RAG database."""
         uploaded = request.FILES.get("file")
         if not uploaded:
             return Response({"error": "No file uploaded."}, status=status.HTTP_400_BAD_REQUEST)
-        text = uploaded.read().decode("utf-8", errors="ignore").strip()
-        if not text:
-            return Response({"error": "Uploaded file is empty."}, status=status.HTTP_400_BAD_REQUEST)
 
-        title = request.data.get("title") or uploaded.name.rsplit(".", 1)[0].replace("_", " ").title()
-        source = request.data.get("source") or "Admin Uploaded Guideline"
+        filename = (uploaded.name or "").lower()
+        text = ""
+        try:
+            if filename.endswith(".pdf"):
+                from pypdf import PdfReader
+                reader = PdfReader(uploaded)
+                pages = [(p.extract_text() or "").strip() for p in reader.pages]
+                text = "\n\n".join(p for p in pages if p)
+            elif filename.endswith(".docx"):
+                import docx
+                document = docx.Document(uploaded)
+                parts = [p.text.strip() for p in document.paragraphs if p.text.strip()]
+                for tbl in document.tables:
+                    for row in tbl.rows:
+                        row_txt = " | ".join(c.text.strip() for c in row.cells if c.text.strip())
+                        if row_txt:
+                            parts.append(row_txt)
+                text = "\n\n".join(parts)
+            else:
+                text = uploaded.read().decode("utf-8", errors="ignore").strip()
+        except Exception as exc:
+            return Response({"error": f"Could not extract text from document: {exc}"}, status=status.HTTP_400_BAD_REQUEST)
+
+        if not text:
+            return Response({"error": "Uploaded document contains no readable text."}, status=status.HTTP_400_BAD_REQUEST)
+
+        ext = filename.rsplit(".", 1)[-1] if "." in filename else "txt"
+        title = request.data.get("title") or uploaded.name.rsplit(".", 1)[0].replace("_", " ").replace("-", " ").title()
+        source = request.data.get("source") or f"Uploaded {ext.upper()} Document"
         language = request.data.get("language") or "en"
-        auto_approve = str(request.data.get("approve", "false")).lower() in ("true", "1", "yes")
+        auto_approve = str(request.data.get("approve", "true")).lower() in ("true", "1", "yes")
 
         with bounded_semaphore("ai:ingest", max_concurrent=4):
             with transaction.atomic():
                 doc = KnowledgeDocument.objects.create(
                     title=title,
                     source=source,
+                    document_type=ext[:20],
                     language=language,
                     content=text,
                     review_status=KnowledgeDocument.ReviewStatus.APPROVED if auto_approve else KnowledgeDocument.ReviewStatus.DRAFT,
@@ -196,5 +221,5 @@ class KnowledgeDocumentViewSet(viewsets.ModelViewSet):
                 )
                 if auto_approve:
                     ingest_document(doc)
-                log_audit(request, "ai.knowledge.upload", "KnowledgeDocument", doc.id, {"title": doc.title})
+                log_audit(request, "ai.knowledge.upload", "KnowledgeDocument", doc.id, {"title": doc.title, "type": ext})
         return Response(KnowledgeDocumentSerializer(doc).data, status=status.HTTP_201_CREATED)
