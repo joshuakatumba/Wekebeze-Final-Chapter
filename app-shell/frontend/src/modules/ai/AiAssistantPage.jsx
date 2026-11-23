@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Plus, Send, Trash2, AlertTriangle, History, X } from "lucide-react";
+import { Plus, Send, Trash2, AlertTriangle, History, X, ThumbsUp, ThumbsDown } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "../../api/client";
 import { ENDPOINTS } from "../../api/endpoints";
@@ -18,7 +18,18 @@ export default function AiAssistantPage() {
   const [streaming, setStreaming] = useState(false);
   const [streamDraft, setStreamDraft] = useState("");
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [ratings, setRatings] = useState({});
   const endRef = useRef(null);
+
+  const rateMessage = async (messageId, rating) => {
+    if (!activeId) return;
+    setRatings((prev) => ({ ...prev, [messageId]: rating }));
+    try {
+      await api.post(ENDPOINTS.aiFeedback(activeId), { message_id: messageId, rating });
+    } catch {
+      toast.error("Could not save feedback");
+    }
+  };
 
   const loadConversations = async () => {
     try {
@@ -208,6 +219,34 @@ export default function AiAssistantPage() {
                   {!isUser && Array.isArray(m.sources) && m.sources.length > 0 && (
                     <div style={{ marginTop: 8, paddingTop: 8, borderTop: "1px solid var(--border-subtle)" }} className="row">
                       {m.sources.map((s, si) => <Badge key={si} tone="success">{s.title}</Badge>)}
+                    </div>
+                  )}
+                  {!isUser && !String(m.id).startsWith("tmp-") && (
+                    <div className="row" style={{ gap: 6, marginTop: 8 }}>
+                      <button
+                        type="button"
+                        onClick={() => rateMessage(m.id, 1)}
+                        aria-label="Helpful"
+                        style={{
+                          background: ratings[m.id] === 1 ? "var(--color-teal-soft)" : "transparent",
+                          color: ratings[m.id] === 1 ? "var(--color-teal-dark)" : "var(--color-pebble)",
+                          border: "none", borderRadius: 8, padding: 4, cursor: "pointer", display: "inline-flex",
+                        }}
+                      >
+                        <ThumbsUp size={13} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => rateMessage(m.id, -1)}
+                        aria-label="Not helpful"
+                        style={{
+                          background: ratings[m.id] === -1 ? "var(--color-linen-mist)" : "transparent",
+                          color: ratings[m.id] === -1 ? "var(--color-rose-600)" : "var(--color-pebble)",
+                          border: "none", borderRadius: 8, padding: 4, cursor: "pointer", display: "inline-flex",
+                        }}
+                      >
+                        <ThumbsDown size={13} />
+                      </button>
                     </div>
                   )}
                 </div>

@@ -2,7 +2,7 @@
 from typing import Any, TypedDict
 
 from .llm import generate_llm_reply
-from .rag import retrieve_approved_chunks
+from .rag import record_knowledge_gap, retrieve_approved_chunks
 from .safety import detect_urgent_symptoms, ensure_safety_footer, urgent_escalation_message
 
 try:
@@ -94,6 +94,8 @@ def generate_response_node(state: ChatState) -> ChatState:
         chunks,
     )
     if llm_answer:
+        if not chunks:
+            record_knowledge_gap(state.get("user_message", ""), language=lang, suggested_answer=llm_answer)
         return {**state, "response": llm_answer}
 
     # Grounded knowledge-base response when no external LLM key is configured
@@ -105,6 +107,8 @@ def generate_response_node(state: ChatState) -> ChatState:
         )
         body = "\n\n".join(f"**{c['title']}**\n{c['content']}" for c in chunks[:2])
         return {**state, "response": intro + body}
+
+    record_knowledge_gap(state.get("user_message", ""), language=lang)
 
     fallback = (
         "Nsonyiwa, sirina bubaka bukakasiddwa bukwata butereevu ku kibuuzo ekyo mu kiseera kino. "

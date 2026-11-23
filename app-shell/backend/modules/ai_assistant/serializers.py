@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Conversation, KnowledgeDocument, Message
+from .models import Conversation, KnowledgeDocument, LearningInsight, Message
 
 
 class KnowledgeDocumentSerializer(serializers.ModelSerializer):
@@ -38,3 +38,13 @@ class ConversationDetailSerializer(ConversationSerializer):
     class Meta(ConversationSerializer.Meta):
         fields = ConversationSerializer.Meta.fields + ["messages"]
 
+
+class LearningInsightSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = LearningInsight
+        fields = [
+            "id", "question_pattern", "suggested_answer", "language",
+            "insight_type", "hit_count", "helpful_votes", "status",
+            "created_at", "updated_at",
+        ]
+        read_only_fields = ["id", "hit_count", "helpful_votes", "created_at", "updated_at"]

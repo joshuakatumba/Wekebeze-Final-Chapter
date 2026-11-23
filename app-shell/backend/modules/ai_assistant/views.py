@@ -11,12 +11,13 @@ from core.concurrency import ConcurrencyBusyError, bounded_semaphore, distribute
 from core.permissions import has_role
 from core.services import log_audit
 from .graph import run_chat_graph
-from .models import Conversation, KnowledgeDocument, Message
-from .rag import ingest_document
+from .models import Conversation, KnowledgeDocument, LearningInsight, Message, MessageFeedback
+from .rag import apply_feedback_learning, ingest_document
 from .serializers import (
     ConversationDetailSerializer,
     ConversationSerializer,
     KnowledgeDocumentSerializer,
+    LearningInsightSerializer,
     MessageSerializer,
 )
 
@@ -110,6 +111,29 @@ class ConversationViewSet(viewsets.ModelViewSet):
             "assistant_message": MessageSerializer(assistant_msg).data,
             "conversation_title": final_title,
         }, status=status.HTTP_201_CREATED)
+
+    @action(detail=True, methods=["post"], url_path="feedback")
+    def feedback(self, request, pk=None):
+        """Record user 👍 (+1) / 👎 (-1) feedback to self-improve retrieval rankings and learning insights."""
+        conversation = self.get_object()
+        message_id = request.data.get("message_id")
+        try:
+            rating = int(request.data.get("rating", 0))
+        except (TypeError, ValueError):
+            rating = 0
+        if rating not in (1, -1):
+            return Response({"error": "rating must be 1 or -1."}, status=status.HTTP_400_BAD_REQUEST)
+
+        msg = conversation.messages.filter(id=message_id, role=Message.Role.ASSISTANT).first()
+        if not msg:
+            return Response({"error": "Assistant message not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        MessageFeedback.objects.update_or_create(
+            message=msg, user=request.user,
+            defaults={"rating": rating, "comment": (request.data.get("comment") or "")[:300]},
+        )
+        apply_feedback_learning(msg, rating)
+        return Response({"status": "recorded", "rating": rating})
 
 
 class KnowledgeDocumentViewSet(viewsets.ModelViewSet):
@@ -223,3 +247,53 @@ class KnowledgeDocumentViewSet(viewsets.ModelViewSet):
                     ingest_document(doc)
                 log_audit(request, "ai.knowledge.upload", "KnowledgeDocument", doc.id, {"title": doc.title, "type": ext})
         return Response(KnowledgeDocumentSerializer(doc).data, status=status.HTTP_201_CREATED)
+
+
+class LearningInsightViewSet(viewsets.ModelViewSet):
+    """Self-improvement review queue for Health Educators & Admins."""
+
+    serializer_class = LearningInsightSerializer
+    permission_classes = [has_role("admin", "provider")]
+    pagination_class = None
+
+    def get_queryset(self):
+        qs = LearningInsight.objects.all()
+        status_f = self.request.query_params.get("status")
+        if status_f:
+            qs = qs.filter(status=status_f)
+        return qs
+
+    @action(detail=True, methods=["post"], url_path="promote")
+    def promote(self, request, pk=None):
+        """Promote a verified learned insight into an approved vector-indexed KnowledgeDocument."""
+        insight = self.get_object()
+        title = (request.data.get("title") or insight.question_pattern[:120]).strip()
+        answer = (request.data.get("answer") or insight.suggested_answer).strip()
+        if not answer:
+            return Response({"error": "Provide a verified answer before promoting."}, status=status.HTTP_400_BAD_REQUEST)
+
+        with bounded_semaphore("ai:ingest", max_concurrent=4):
+            with transaction.atomic():
+                doc = KnowledgeDocument.objects.create(
+                    title=title,
+                    source="Wekebeze Learned & Educator-Verified",
+                    document_type="learned",
+                    language=insight.language,
+                    content=f"Question: {insight.question_pattern}\n\nVerified Guidance:\n{answer}",
+                    review_status=KnowledgeDocument.ReviewStatus.APPROVED,
+                    reviewed_by=request.user,
+                    published_at=timezone.now(),
+                )
+                ingest_document(doc)
+                insight.status = LearningInsight.Status.PROMOTED
+                insight.suggested_answer = answer
+                insight.save(update_fields=["status", "suggested_answer", "updated_at"])
+                log_audit(request, "ai.insight.promote", "LearningInsight", insight.id, {"doc_id": str(doc.id)})
+        return Response(KnowledgeDocumentSerializer(doc).data, status=status.HTTP_201_CREATED)
+
+    @action(detail=True, methods=["post"], url_path="dismiss")
+    def dismiss(self, request, pk=None):
+        insight = self.get_object()
+        insight.status = LearningInsight.Status.DISMISSED
+        insight.save(update_fields=["status", "updated_at"])
+        return Response(LearningInsightSerializer(insight).data)

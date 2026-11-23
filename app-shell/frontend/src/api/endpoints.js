@@ -50,8 +50,12 @@ export const ENDPOINTS = {
   aiConversations: "/ai/conversations/",
   aiConversation: (id) => `/ai/conversations/${id}/`,
   aiMessages: (id) => `/ai/conversations/${id}/messages/`,
+  aiFeedback: (id) => `/ai/conversations/${id}/feedback/`,
   aiKnowledge: "/ai/knowledge/",
   aiKnowledgeItem: (id) => `/ai/knowledge/${id}/`,
   aiKnowledgeApprove: (id) => `/ai/knowledge/${id}/approve/`,
   aiKnowledgeUpload: "/ai/knowledge/upload/",
+  aiInsights: "/ai/insights/",
+  aiInsightPromote: (id) => `/ai/insights/${id}/promote/`,
+  aiInsightDismiss: (id) => `/ai/insights/${id}/dismiss/`,
 };

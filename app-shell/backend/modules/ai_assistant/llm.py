@@ -70,6 +70,9 @@ def resolve_llm_config() -> dict:
             provider = "openai"
 
     defaults = PROVIDER_DEFAULTS.get(provider, PROVIDER_DEFAULTS["custom"])
+    # Guard against setting LLM_MODEL to the provider name (e.g. LLM_MODEL=groq)
+    if model.lower() == provider:
+        model = ""
     return {
         "provider": provider,
         "model": model or defaults["model"],

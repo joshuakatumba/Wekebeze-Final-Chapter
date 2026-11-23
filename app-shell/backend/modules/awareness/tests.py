@@ -238,3 +238,33 @@ class WekebezePlatformTests(TestCase):
             self.assertEqual(cfg["provider"], "ollama")
             self.assertEqual(cfg["model"], "llama3.2")
 
+    def test_vector_embeddings_and_self_improving_feedback(self):
+        from modules.ai_assistant.models import KnowledgeChunk, LearningInsight
+
+        # Re-ingest an approved doc to verify 256-dim dense vector storage
+        chunk = KnowledgeChunk.objects.first()
+        self.assertIsNotNone(chunk)
+        self.assertEqual(len(chunk.embedding), 256)
+
+        self.client.force_authenticate(user=self.user)
+        conv = self.client.post("/api/v1/ai/conversations/", {"language": "en"}, format="json").data
+        msg_res = self.client.post(
+            f"/api/v1/ai/conversations/{conv['id']}/messages/",
+            {"content": "What are the symptoms of breast cancer?", "language": "en"},
+            format="json",
+        )
+        asst_id = msg_res.data["assistant_message"]["id"]
+
+        # Positive user feedback increases chunk quality_score and creates a LearningInsight
+        fb_res = self.client.post(
+            f"/api/v1/ai/conversations/{conv['id']}/feedback/",
+            {"message_id": asst_id, "rating": 1},
+            format="json",
+        )
+        self.assertEqual(fb_res.status_code, 200)
+        cited_chunk_id = msg_res.data["assistant_message"]["sources"][0]["chunk_id"]
+        updated_chunk = KnowledgeChunk.objects.get(id=cited_chunk_id)
+        self.assertEqual(updated_chunk.helpful_count, 1)
+        self.assertGreater(updated_chunk.quality_score, 1.0)
+        self.assertGreaterEqual(LearningInsight.objects.count(), 1)
+
