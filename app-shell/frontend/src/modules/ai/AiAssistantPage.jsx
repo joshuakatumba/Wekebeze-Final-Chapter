@@ -9,6 +9,107 @@ import { Badge } from "../../components/ui";
 
 const API_URL = import.meta.env.VITE_API_URL || "/api/v1";
 
+/** Clean, XSS-safe inline Markdown renderer (**bold**, *italic*, `code`) */
+function renderInline(text) {
+  const tokens = [];
+  const regex = /(\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`)/g;
+  let last = 0;
+  let m;
+  let key = 0;
+  while ((m = regex.exec(text)) !== null) {
+    if (m.index > last) tokens.push(text.slice(last, m.index));
+    const tok = m[0];
+    if (tok.startsWith("**")) {
+      tokens.push(<strong key={key++} style={{ fontWeight: 600, color: "var(--text-primary)" }}>{tok.slice(2, -2)}</strong>);
+    } else if (tok.startsWith("*")) {
+      tokens.push(<em key={key++} style={{ color: "var(--text-secondary)" }}>{tok.slice(1, -1)}</em>);
+    } else if (tok.startsWith("`")) {
+      tokens.push(<code key={key++} style={{ background: "var(--surface-muted)", padding: "1px 5px", borderRadius: 5, fontSize: "0.9em" }}>{tok.slice(1, -1)}</code>);
+    }
+    last = regex.lastIndex;
+  }
+  if (last < text.length) tokens.push(text.slice(last));
+  return tokens;
+}
+
+/** Structured Markdown message formatter (headings, bullet/numbered lists, paragraphs, dividers) */
+function FormattedMessage({ content }) {
+  const lines = String(content || "").split("\n");
+  const blocks = [];
+  let listItems = [];
+  let listType = null;
+
+  const flushList = () => {
+    if (!listItems.length) return;
+    const Tag = listType === "ol" ? "ol" : "ul";
+    blocks.push(
+      <Tag key={`l-${blocks.length}`} style={{ margin: "6px 0 10px", paddingLeft: 20, display: "flex", flexDirection: "column", gap: 5 }}>
+        {listItems.map((item, i) => (
+          <li key={i} style={{ lineHeight: 1.55 }}>{renderInline(item)}</li>
+        ))}
+      </Tag>
+    );
+    listItems = [];
+    listType = null;
+  };
+
+  lines.forEach((rawLine, idx) => {
+    const line = rawLine.trim();
+    if (!line) {
+      flushList();
+      return;
+    }
+    if (/^-{3,}$/.test(line)) {
+      flushList();
+      blocks.push(<hr key={`hr-${idx}`} style={{ border: "none", borderTop: "1px solid var(--border-subtle)", margin: "12px 0" }} />);
+      return;
+    }
+    const headingMatch = line.match(/^#{1,4}\s+(.+)$/);
+    if (headingMatch) {
+      flushList();
+      blocks.push(
+        <h4 key={`h-${idx}`} style={{ margin: "12px 0 6px", fontSize: 15, fontWeight: 600, color: "var(--text-primary)" }}>
+          {renderInline(headingMatch[1])}
+        </h4>
+      );
+      return;
+    }
+    // Standalone bold line treated as a clean section heading
+    if (/^\*\*[^*]+\*\*$/.test(line)) {
+      flushList();
+      blocks.push(
+        <h4 key={`bh-${idx}`} style={{ margin: blocks.length ? "14px 0 6px" : "0 0 6px", fontSize: 15, fontWeight: 600, color: "var(--text-primary)" }}>
+          {line.slice(2, -2)}
+        </h4>
+      );
+      return;
+    }
+    const ulMatch = line.match(/^[-*•]\s+(.+)$/);
+    if (ulMatch) {
+      if (listType && listType !== "ul") flushList();
+      listType = "ul";
+      listItems.push(ulMatch[1]);
+      return;
+    }
+    const olMatch = line.match(/^\d+\.\s+(.+)$/);
+    if (olMatch) {
+      if (listType && listType !== "ol") flushList();
+      listType = "ol";
+      listItems.push(olMatch[1]);
+      return;
+    }
+    flushList();
+    blocks.push(
+      <p key={`p-${idx}`} style={{ margin: "6px 0", lineHeight: 1.62 }}>
+        {renderInline(line)}
+      </p>
+    );
+  });
+  flushList();
+
+  return <div style={{ fontSize: 14 }}>{blocks}</div>;
+}
+
 export default function AiAssistantPage() {
   const { lang } = useI18n();
   const [conversations, setConversations] = useState([]);
@@ -200,24 +301,27 @@ export default function AiAssistantPage() {
                   key={m.id}
                   style={{
                     alignSelf: isUser ? "flex-end" : "flex-start",
-                    maxWidth: "84%",
+                    maxWidth: isUser ? "80%" : "88%",
                     background: isUser ? "var(--color-lime-voltage)" : isUrgent ? "#fff1f2" : "#ffffff",
                     color: isUser ? "#fff" : isUrgent ? "#881337" : "var(--text-primary)",
-                    padding: "11px 15px",
+                    padding: isUser ? "10px 15px" : "14px 18px",
                     borderRadius: isUser ? "18px 18px 4px 18px" : "4px 18px 18px 18px",
                     boxShadow: isUser ? "none" : "0 1px 4px rgba(0,0,0,0.04)",
                     fontSize: 14,
-                    lineHeight: 1.6,
                   }}
                 >
                   {isUrgent && (
-                    <div className="row" style={{ gap: 6, marginBottom: 6, color: "#e11d48", fontSize: 12 }}>
-                      <AlertTriangle size={14} /> Urgent
+                    <div className="row" style={{ gap: 6, marginBottom: 8, color: "#e11d48", fontSize: 12, fontWeight: 600 }}>
+                      <AlertTriangle size={14} /> Urgent Medical Guidance
                     </div>
                   )}
-                  <div style={{ whiteSpace: "pre-wrap" }}>{m.content}</div>
+                  {isUser ? (
+                    <div style={{ whiteSpace: "pre-wrap", lineHeight: 1.5 }}>{m.content}</div>
+                  ) : (
+                    <FormattedMessage content={m.content} />
+                  )}
                   {!isUser && Array.isArray(m.sources) && m.sources.length > 0 && (
-                    <div style={{ marginTop: 8, paddingTop: 8, borderTop: "1px solid var(--border-subtle)" }} className="row">
+                    <div style={{ marginTop: 10, paddingTop: 8, borderTop: "1px solid var(--border-subtle)" }} className="row">
                       {m.sources.map((s, si) => <Badge key={si} tone="success">{s.title}</Badge>)}
                     </div>
                   )}
@@ -253,8 +357,8 @@ export default function AiAssistantPage() {
               );
             })}
             {streamDraft && (
-              <div style={{ alignSelf: "flex-start", maxWidth: "84%", background: "#ffffff", padding: "11px 15px", borderRadius: "4px 18px 18px 18px", fontSize: 14, lineHeight: 1.6, whiteSpace: "pre-wrap" }}>
-                {streamDraft}
+              <div style={{ alignSelf: "flex-start", maxWidth: "88%", background: "#ffffff", padding: "14px 18px", borderRadius: "4px 18px 18px 18px", boxShadow: "0 1px 4px rgba(0,0,0,0.04)" }}>
+                <FormattedMessage content={streamDraft} />
               </div>
             )}
             <div ref={endRef} />
