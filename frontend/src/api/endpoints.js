@@ -30,6 +30,10 @@ export const ENDPOINTS = {
   guidedProgress: "/awareness/progress/",
   educatorStats: "/awareness/educator-stats/",
   analytics: "/awareness/analytics/",
+  analyticsExport: "/awareness/analytics/export/",
+  reminders: "/awareness/reminders/",
+  reminder: (id) => `/awareness/reminders/${id}/`,
+  reminderComplete: (id) => `/awareness/reminders/${id}/complete/`,
 
   // Wekebeze Quizzes
   quizzes: "/quizzes/",
@@ -45,8 +49,11 @@ export const ENDPOINTS = {
   screeningDistricts: "/screening/centers/districts/",
   screeningNearby: (lat, lng, radiusKm = 50) =>
     `/screening/centers/nearby/?lat=${lat}&lng=${lng}&radius_km=${radiusKm}`,
+  screeningBookings: "/screening/bookings/",
+  screeningBooking: (id) => `/screening/bookings/${id}/`,
 
   // Wekebeze AI Assistant & RAG Knowledge Base
+  aiGuestAsk: "/ai/guest/ask/",
   aiConversations: "/ai/conversations/",
   aiConversation: (id) => `/ai/conversations/${id}/`,
   aiMessages: (id) => `/ai/conversations/${id}/messages/`,

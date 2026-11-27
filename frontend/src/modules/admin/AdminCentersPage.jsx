@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Plus, Pencil, Trash2, Eye, EyeOff, MapPin, Navigation, Share2, Copy } from "lucide-react";
+import { Plus, Pencil, Trash2, Eye, EyeOff, MapPin, Navigation, Share2, Copy, Calendar, CheckCircle2, Phone } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "../../api/client";
 import { ENDPOINTS } from "../../api/endpoints";
@@ -63,14 +63,30 @@ function PinPickerMap({ lat, lng, onPick }) {
 }
 
 export default function AdminCentersPage() {
+  const [tab, setTab] = useState("centers");
   const [centers, setCenters] = useState([]);
+  const [bookings, setBookings] = useState([]);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState(EMPTY_CENTER);
 
   const load = async () => {
-    const res = await api.get(ENDPOINTS.screeningCenters).catch(() => []);
-    setCenters(Array.isArray(res) ? res : []);
+    const [cRes, bRes] = await Promise.all([
+      api.get(ENDPOINTS.screeningCenters).catch(() => []),
+      api.get(ENDPOINTS.screeningBookings).catch(() => []),
+    ]);
+    setCenters(Array.isArray(cRes) ? cRes : []);
+    setBookings(Array.isArray(bRes) ? bRes : []);
+  };
+
+  const updateBookingStatus = async (id, nextStatus) => {
+    try {
+      await api.patch(ENDPOINTS.screeningBooking(id), { status: nextStatus });
+      toast.success(`Booking ${nextStatus}`);
+      load();
+    } catch {
+      toast.error("Could not update booking");
+    }
   };
 
   useEffect(() => { load(); }, []);
@@ -184,7 +200,58 @@ export default function AdminCentersPage() {
         }
       />
 
-      {centers.length === 0 ? (
+      <div className="chip-row">
+        <Button size="sm" variant={tab === "centers" ? "primary" : "outline"} onClick={() => setTab("centers")}>
+          Centers ({centers.length})
+        </Button>
+        <Button size="sm" variant={tab === "bookings" ? "primary" : "outline"} onClick={() => setTab("bookings")}>
+          <Calendar size={13} /> Bookings ({bookings.length})
+        </Button>
+      </div>
+
+      {tab === "bookings" ? (
+        bookings.length === 0 ? (
+          <EmptyState title="No screening bookings yet" />
+        ) : (
+          <div className="grid g2">
+            {bookings.map((b) => (
+              <Card key={b.id} style={{ padding: 18, display: "flex", flexDirection: "column", gap: 10 }}>
+                <div className="between">
+                  <Badge tone={b.status === "confirmed" || b.status === "completed" ? "success" : b.status === "cancelled" ? "danger" : "warning"}>
+                    {b.status}
+                  </Badge>
+                  <Badge>{b.source}</Badge>
+                </div>
+                <h3 style={{ margin: 0, fontSize: 16 }}>{b.full_name}</h3>
+                <div className="row" style={{ fontSize: 13, color: "var(--color-slate)", gap: 6 }}>
+                  <Phone size={13} color="#14b8a6" /> {b.phone}
+                </div>
+                <div style={{ fontSize: 13, color: "var(--color-slate)" }}>
+                  <strong>{b.center_name}</strong> · {b.service_name}
+                  {b.preferred_date ? ` · ${b.preferred_date}` : ""}
+                </div>
+                <div className="row" style={{ marginTop: "auto", gap: 6 }}>
+                  {b.status === "pending" && (
+                    <Button variant="teal" size="sm" onClick={() => updateBookingStatus(b.id, "confirmed")}>
+                      <CheckCircle2 size={13} /> Confirm
+                    </Button>
+                  )}
+                  {b.status !== "completed" && (
+                    <Button variant="outline" size="sm" onClick={() => updateBookingStatus(b.id, "completed")}>
+                      Complete
+                    </Button>
+                  )}
+                  {b.status !== "cancelled" && (
+                    <Button variant="outline" size="sm" onClick={() => updateBookingStatus(b.id, "cancelled")}>
+                      Cancel
+                    </Button>
+                  )}
+                </div>
+              </Card>
+            ))}
+          </div>
+        )
+      ) : centers.length === 0 ? (
         <EmptyState title="No screening centers yet" />
       ) : (
         <div className="grid g2">

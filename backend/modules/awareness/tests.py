@@ -268,3 +268,68 @@ class WekebezePlatformTests(TestCase):
         self.assertGreater(updated_chunk.quality_score, 1.0)
         self.assertGreaterEqual(LearningInsight.objects.count(), 1)
 
+    def test_guest_ai_bookings_reminders_and_impact_export(self):
+        from datetime import date, timedelta
+        from modules.screening.models import ScreeningCenter
+
+        # 1. Anonymous guest AI chat returns reply + recommended Kampala screening centers
+        guest_res = self.client.post(
+            "/api/v1/ai/guest/ask/",
+            {"content": "Where can I get free cervical screening in Kampala?", "language": "en"},
+            format="json",
+        )
+        self.assertEqual(guest_res.status_code, 200)
+        self.assertTrue(guest_res.data["content"])
+        self.assertGreaterEqual(len(guest_res.data["metadata"]["recommended_centers"]), 1)
+
+        # 2. Guest booking creation + admin status update
+        center = ScreeningCenter.objects.first()
+        book_res = self.client.post(
+            "/api/v1/screening/bookings/",
+            {
+                "center": str(center.id),
+                "full_name": "Sarah Namono",
+                "phone": "+256772000111",
+                "service_name": "VIA Screening",
+                "source": "guest_chat",
+            },
+            format="json",
+        )
+        self.assertEqual(book_res.status_code, 201)
+        booking_id = book_res.data["id"]
+
+        self.client.force_authenticate(user=self.admin)
+        upd_res = self.client.patch(
+            f"/api/v1/screening/bookings/{booking_id}/",
+            {"status": "confirmed"},
+            format="json",
+        )
+        self.assertEqual(upd_res.status_code, 200)
+        self.assertEqual(upd_res.data["status"], "confirmed")
+
+        # 3. Personal health reminder + complete advances next_due_date
+        self.client.force_authenticate(user=self.user)
+        today = date.today()
+        rem_res = self.client.post(
+            "/api/v1/awareness/reminders/",
+            {
+                "reminder_type": "breast_self_exam",
+                "title": "Monthly Breast Self-Exam",
+                "frequency": "monthly",
+                "next_due_date": today.isoformat(),
+                "channel": "in_app",
+            },
+            format="json",
+        )
+        self.assertEqual(rem_res.status_code, 201)
+        done_res = self.client.post(f"/api/v1/awareness/reminders/{rem_res.data['id']}/complete/")
+        self.assertEqual(done_res.status_code, 200)
+        self.assertEqual(done_res.data["next_due_date"], (today + timedelta(days=30)).isoformat())
+
+        # 4. Admin CSV impact report export
+        self.client.force_authenticate(user=self.admin)
+        csv_res = self.client.get("/api/v1/awareness/analytics/export/")
+        self.assertEqual(csv_res.status_code, 200)
+        self.assertIn("text/csv", csv_res["Content-Type"])
+        self.assertIn("Total Screening Bookings", csv_res.content.decode("utf-8"))
+

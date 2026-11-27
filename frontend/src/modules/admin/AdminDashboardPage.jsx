@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Settings, Eye, EyeOff, ShieldCheck } from "lucide-react";
+import { Settings, Eye, EyeOff, ShieldCheck, Download } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "../../api/client";
 import { ENDPOINTS } from "../../api/endpoints";
@@ -59,6 +59,27 @@ export default function AdminDashboardPage({ onNavigate }) {
     }
   };
 
+  const exportImpactCsv = async () => {
+    try {
+      const token = localStorage.getItem("shell_token");
+      const base = import.meta.env.VITE_API_URL || "/api/v1";
+      const res = await fetch(`${base}${ENDPOINTS.analyticsExport}`, {
+        headers: token ? { Authorization: `Token ${token}` } : {},
+      });
+      if (!res.ok) throw new Error("Export failed");
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `wekebeze-impact-report-${new Date().toISOString().slice(0, 10)}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success("Impact report downloaded");
+    } catch {
+      toast.error("Could not export impact report");
+    }
+  };
+
   if (loading) return <PageSkeleton />;
 
   return (
@@ -66,16 +87,21 @@ export default function AdminDashboardPage({ onNavigate }) {
       <PageHead
         title="Admin Dashboard"
         action={
-          <Button variant="outline" size="sm" onClick={() => setSettingsOpen(true)}>
-            <Settings size={14} /> Site Settings
-          </Button>
+          <div className="row" style={{ gap: 8 }}>
+            <Button variant="teal" size="sm" onClick={exportImpactCsv}>
+              <Download size={14} /> Impact CSV
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => setSettingsOpen(true)}>
+              <Settings size={14} /> Site Settings
+            </Button>
+          </div>
         }
       />
 
       <div className="grid g4">
         <Stat label="Users" value={analytics?.users?.total || 0} />
         <Stat label="AI Chats" value={analytics?.ai_assistant?.total_conversations || 0} />
-        <Stat label="Quiz Attempts" value={analytics?.quizzes?.total_attempts || 0} />
+        <Stat label="Bookings" value={analytics?.screening?.total_bookings || 0} />
         <Stat label="Approved Docs" value={analytics?.ai_assistant?.approved_documents || 0} />
       </div>
 

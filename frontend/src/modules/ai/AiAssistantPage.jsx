@@ -1,11 +1,12 @@
 import React, { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Plus, Send, Trash2, AlertTriangle, History, X, ThumbsUp, ThumbsDown } from "lucide-react";
+import { Plus, Send, Trash2, AlertTriangle, History, X, ThumbsUp, ThumbsDown, Mic, MicOff, Volume2, VolumeX, Calendar, MapPin } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "../../api/client";
 import { ENDPOINTS } from "../../api/endpoints";
 import { useI18n } from "../../context/I18nContext";
-import { Badge } from "../../components/ui";
+import { Badge, Button } from "../../components/ui";
+import BookingModal from "../screening/BookingModal";
 
 const API_URL = import.meta.env.VITE_API_URL || "/api/v1";
 
@@ -179,7 +180,57 @@ export default function AiAssistantPage() {
   const [streamDraft, setStreamDraft] = useState("");
   const [historyOpen, setHistoryOpen] = useState(false);
   const [ratings, setRatings] = useState({});
+  const [bookingCenter, setBookingCenter] = useState(null);
+  const [listening, setListening] = useState(false);
+  const [speakingId, setSpeakingId] = useState(null);
+  const recognitionRef = useRef(null);
   const endRef = useRef(null);
+
+  const SpeechRecognition =
+    typeof window !== "undefined" && (window.SpeechRecognition || window.webkitSpeechRecognition);
+
+  const toggleVoiceInput = () => {
+    if (!SpeechRecognition) {
+      toast.error("Voice input is not supported on this browser");
+      return;
+    }
+    if (listening && recognitionRef.current) {
+      recognitionRef.current.stop();
+      setListening(false);
+      return;
+    }
+    const rec = new SpeechRecognition();
+    rec.lang = lang === "lg" ? "lg-UG" : "en-UG";
+    rec.interimResults = false;
+    rec.onresult = (ev) => {
+      const transcript = ev.results?.[0]?.[0]?.transcript || "";
+      if (transcript) setInput((prev) => (prev ? `${prev} ${transcript}` : transcript));
+    };
+    rec.onerror = () => setListening(false);
+    rec.onend = () => setListening(false);
+    recognitionRef.current = rec;
+    setListening(true);
+    rec.start();
+  };
+
+  const toggleSpeak = (msgId, text) => {
+    if (typeof window === "undefined" || !window.speechSynthesis) {
+      toast.error("Audio playback is not supported on this browser");
+      return;
+    }
+    window.speechSynthesis.cancel();
+    if (speakingId === msgId) {
+      setSpeakingId(null);
+      return;
+    }
+    const clean = String(text || "").replace(/[#*`_>-]/g, " ");
+    const utter = new SpeechSynthesisUtterance(clean);
+    utter.lang = lang === "lg" ? "en-UG" : "en-US";
+    utter.onend = () => setSpeakingId(null);
+    utter.onerror = () => setSpeakingId(null);
+    setSpeakingId(msgId);
+    window.speechSynthesis.speak(utter);
+  };
 
   const rateMessage = async (messageId, rating) => {
     if (!activeId) return;
@@ -371,6 +422,26 @@ export default function AiAssistantPage() {
                       </div>
                     )}
                     <FormattedMessage content={m.content} />
+                    {Array.isArray(m.metadata?.recommended_centers) && m.metadata.recommended_centers.length > 0 && (
+                      <div className="stack" style={{ gap: 8, marginTop: 12, paddingTop: 10, borderTop: "1px solid var(--border-subtle)" }}>
+                        <span style={{ fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em", color: "var(--color-slate)" }}>
+                          {lang === "lg" ? "Ebifo by'okwekebeza ebikakasiddwa" : "Verified Screening Centers"}
+                        </span>
+                        {m.metadata.recommended_centers.map((c) => (
+                          <div key={c.id} className="between" style={{ padding: "9px 11px", background: "var(--surface-muted)", borderRadius: 10, gap: 8, flexWrap: "wrap" }}>
+                            <div style={{ minWidth: 0, flex: 1 }}>
+                              <strong style={{ fontSize: 13, display: "block" }}>{c.name}</strong>
+                              <span style={{ fontSize: 12, color: "var(--color-slate)", display: "inline-flex", alignItems: "center", gap: 4 }}>
+                                <MapPin size={12} color="#f43f5e" /> {c.district} · {c.location}
+                              </span>
+                            </div>
+                            <Button type="button" variant="teal" size="sm" onClick={() => setBookingCenter(c)}>
+                              <Calendar size={13} /> {lang === "lg" ? "Saba" : "Book"}
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                     {Array.isArray(m.sources) && m.sources.length > 0 && (
                       <div className="ai-sources">
                         {m.sources.map((s, si) => <Badge key={si} tone="success">{s.title}</Badge>)}
@@ -378,6 +449,19 @@ export default function AiAssistantPage() {
                     )}
                     {!String(m.id).startsWith("tmp-") && (
                       <div className="row" style={{ gap: 6, marginTop: 8 }}>
+                        <button
+                          type="button"
+                          onClick={() => toggleSpeak(m.id, m.content)}
+                          aria-label={speakingId === m.id ? "Stop reading" : "Listen"}
+                          title={speakingId === m.id ? "Stop" : "Listen"}
+                          style={{
+                            background: speakingId === m.id ? "var(--color-linen-mist)" : "transparent",
+                            color: speakingId === m.id ? "var(--color-rose-600)" : "var(--color-pebble)",
+                            border: "none", borderRadius: 8, padding: 4, cursor: "pointer", display: "inline-flex",
+                          }}
+                        >
+                          {speakingId === m.id ? <VolumeX size={13} /> : <Volume2 size={13} />}
+                        </button>
                         <button
                           type="button"
                           onClick={() => rateMessage(m.id, 1)}
@@ -426,13 +510,30 @@ export default function AiAssistantPage() {
           <input
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder={lang === "lg" ? "Buuza ekibuuzo..." : "Ask a question..."}
+            placeholder={listening ? (lang === "lg" ? "Mpula..." : "Listening...") : (lang === "lg" ? "Buuza ekibuuzo..." : "Ask a question...")}
             disabled={streaming}
             style={{
               flex: 1, minWidth: 0, border: "none", background: "transparent",
               color: "var(--text-primary)", fontSize: 14, outline: "none", padding: "8px 0",
             }}
           />
+          {SpeechRecognition && (
+            <button
+              type="button"
+              onClick={toggleVoiceInput}
+              disabled={streaming}
+              aria-label={listening ? "Stop voice input" : "Voice input"}
+              title={listening ? "Stop voice input" : "Speak"}
+              style={{
+                width: 34, height: 34, borderRadius: "50%", border: "none", flexShrink: 0,
+                display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer",
+                background: listening ? "var(--color-linen-mist)" : "transparent",
+                color: listening ? "var(--color-rose-600)" : "var(--color-slate)",
+              }}
+            >
+              {listening ? <MicOff size={15} /> : <Mic size={15} />}
+            </button>
+          )}
           <button
             type="submit"
             className="btn btn-primary"
@@ -482,6 +583,9 @@ export default function AiAssistantPage() {
           </div>
         </div>,
         document.body
+      )}
+      {bookingCenter && (
+        <BookingModal center={bookingCenter} source="ai_chat" onClose={() => setBookingCenter(null)} />
       )}
     </div>
   );

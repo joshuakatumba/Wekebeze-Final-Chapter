@@ -3,7 +3,7 @@ from django.db import transaction
 from django.http import StreamingHttpResponse
 from django.utils import timezone
 from rest_framework import permissions, status, viewsets
-from rest_framework.decorators import action
+from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.renderers import BaseRenderer, JSONRenderer
 from rest_framework.response import Response
@@ -84,6 +84,7 @@ class ConversationViewSet(viewsets.ModelViewSet):
                     assistant_text = result.get("response", "")
                     sources = result.get("sources", [])
                     is_urgent = bool(result.get("is_urgent", False))
+                    recommended_centers = result.get("recommended_centers", [])
 
                     with transaction.atomic():
                         locked_conv = Conversation.objects.select_for_update().get(pk=conversation.pk)
@@ -92,7 +93,11 @@ class ConversationViewSet(viewsets.ModelViewSet):
                             role=Message.Role.ASSISTANT,
                             content=assistant_text,
                             sources=sources,
-                            metadata={"language": result.get("language", language), "is_urgent": is_urgent},
+                            metadata={
+                                "language": result.get("language", language),
+                                "is_urgent": is_urgent,
+                                "recommended_centers": recommended_centers,
+                            },
                         )
                         locked_conv.updated_at = timezone.now()
                         locked_conv.save(update_fields=["updated_at"])
@@ -308,3 +313,38 @@ class LearningInsightViewSet(viewsets.ModelViewSet):
         insight.status = LearningInsight.Status.DISMISSED
         insight.save(update_fields=["status", "updated_at"])
         return Response(LearningInsightSerializer(insight).data)
+
+
+@api_view(["POST"])
+@permission_classes([permissions.AllowAny])
+def guest_ask_view(request):
+    """Anonymous guest AI endpoint (no sign-up required; stateless, up to 4 turns of history)."""
+    content = (request.data.get("content") or "").strip()
+    language = request.data.get("language") or "en"
+    raw_history = request.data.get("history") or []
+    if not content:
+        return Response({"error": "Message content is required."}, status=status.HTTP_400_BAD_REQUEST)
+    if len(content) > 600:
+        return Response({"error": "Guest message is too long (max 600 characters)."}, status=status.HTTP_400_BAD_REQUEST)
+
+    safe_history = [
+        {"role": h.get("role"), "content": str(h.get("content", ""))[:600]}
+        for h in raw_history[-4:]
+        if isinstance(h, dict) and h.get("role") in ("user", "assistant")
+    ]
+
+    try:
+        with bounded_semaphore("ai:inference", max_concurrent=10, ttl_seconds=35):
+            result = run_chat_graph(content, language=language, history=safe_history)
+    except ConcurrencyBusyError as exc:
+        return Response({"error": str(exc)}, status=status.HTTP_429_TOO_MANY_REQUESTS)
+
+    return Response({
+        "content": result.get("response", ""),
+        "sources": result.get("sources", []),
+        "metadata": {
+            "language": result.get("language", language),
+            "is_urgent": bool(result.get("is_urgent", False)),
+            "recommended_centers": result.get("recommended_centers", []),
+        },
+    })

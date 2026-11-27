@@ -1,22 +1,32 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { MapPin, Phone, List, Map as MapIcon, Navigation, Share2, ExternalLink } from "lucide-react";
+import { MapPin, Phone, List, Map as MapIcon, Navigation, Share2, ExternalLink, Calendar } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "../../api/client";
 import { ENDPOINTS } from "../../api/endpoints";
+import { useAuth } from "../../context/AuthContext";
 import { useI18n } from "../../context/I18nContext";
 import { PageHead, Card, Badge, Button, EmptyState, Modal } from "../../components/ui";
+import BookingModal from "./BookingModal";
 
 export default function ScreeningPage() {
+  const { user } = useAuth();
   const { t } = useI18n();
   const [centers, setCenters] = useState([]);
+  const [bookings, setBookings] = useState([]);
   const [districts, setDistricts] = useState([]);
   const [district, setDistrict] = useState("All");
   const [view, setView] = useState("list");
   const [selected, setSelected] = useState(null);
+  const [bookingCenter, setBookingCenter] = useState(null);
   const [loading, setLoading] = useState(true);
   const [locating, setLocating] = useState(false);
   const mapElRef = useRef(null);
   const mapInstanceRef = useRef(null);
+
+  const loadBookings = () => {
+    if (!user) return;
+    api.get(ENDPOINTS.screeningBookings).then((b) => setBookings(Array.isArray(b) ? b : [])).catch(() => {});
+  };
 
   useEffect(() => {
     Promise.all([
@@ -29,7 +39,8 @@ export default function ScreeningPage() {
       })
       .catch(() => toast.error("Failed to load screening centers"))
       .finally(() => setLoading(false));
-  }, []);
+    loadBookings();
+  }, [user]);
 
   const findNearMe = () => {
     if (!navigator.geolocation) {
@@ -111,6 +122,11 @@ export default function ScreeningPage() {
             <Button variant={view === "map" ? "dark" : "outline"} size="sm" onClick={() => setView("map")}>
               <MapIcon size={14} />
             </Button>
+            {user && (
+              <Button variant={view === "bookings" ? "primary" : "outline"} size="sm" onClick={() => setView("bookings")}>
+                <Calendar size={14} /> {bookings.length > 0 ? `(${bookings.length})` : ""}
+              </Button>
+            )}
           </div>
         }
       />
@@ -128,6 +144,32 @@ export default function ScreeningPage() {
 
       {loading ? (
         <div className="grid g2">{[1, 2].map((i) => <div key={i} className="skeleton" style={{ height: 150 }} />)}</div>
+      ) : view === "bookings" ? (
+        bookings.length === 0 ? (
+          <EmptyState title="No screening bookings yet" />
+        ) : (
+          <div className="grid g2">
+            {bookings.map((b) => (
+              <Card key={b.id} style={{ padding: 18, display: "flex", flexDirection: "column", gap: 8 }}>
+                <div className="between">
+                  <Badge tone={b.status === "confirmed" || b.status === "completed" ? "success" : b.status === "cancelled" ? "danger" : "warning"}>
+                    {b.status}
+                  </Badge>
+                  <span style={{ fontSize: 12, color: "var(--color-slate)" }}>
+                    {b.preferred_date || new Date(b.created_at).toLocaleDateString()}
+                  </span>
+                </div>
+                <h3 style={{ margin: 0, fontSize: 16 }}>{b.center_name}</h3>
+                <div style={{ fontSize: 13, color: "var(--color-slate)" }}>{b.service_name} · {b.center_district}</div>
+                {b.center_contact && (
+                  <div className="row" style={{ fontSize: 12, color: "var(--color-teal-dark)", gap: 6 }}>
+                    <Phone size={12} /> {b.center_contact}
+                  </div>
+                )}
+              </Card>
+            ))}
+          </div>
+        )
       ) : view === "map" ? (
         <Card style={{ padding: 6 }}>
           <div ref={mapElRef} style={{ height: "min(62dvh, 500px)", width: "100%", borderRadius: 10 }} />
@@ -147,8 +189,11 @@ export default function ScreeningPage() {
                 <MapPin size={15} color="#f43f5e" /> {c.location}
               </div>
               <div className="card-actions" style={{ marginTop: "auto", paddingTop: 6 }}>
+                <Button variant="primary" size="sm" onClick={() => setBookingCenter(c)}>
+                  <Calendar size={14} /> Book
+                </Button>
                 <Button variant="outline" size="sm" onClick={() => setSelected(c)}>
-                  View Services &amp; Contact
+                  Services
                 </Button>
               </div>
             </Card>
@@ -196,9 +241,29 @@ export default function ScreeningPage() {
               >
                 <Share2 size={14} /> Share
               </Button>
+              <Button
+                variant="teal"
+                size="sm"
+                onClick={() => {
+                  const target = selected;
+                  setSelected(null);
+                  setBookingCenter(target);
+                }}
+              >
+                <Calendar size={14} /> Book
+              </Button>
             </div>
           </div>
         </Modal>
+      )}
+
+      {bookingCenter && (
+        <BookingModal
+          center={bookingCenter}
+          source="locator"
+          onClose={() => setBookingCenter(null)}
+          onBooked={loadBookings}
+        />
       )}
     </div>
   );

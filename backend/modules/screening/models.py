@@ -1,4 +1,5 @@
 import uuid
+from django.conf import settings
 from django.db import models
 
 
@@ -43,4 +44,38 @@ class CenterService(models.Model):
 
     def __str__(self):
         return f"{self.name} — {self.price} {self.currency}"
+
+
+class ScreeningBooking(models.Model):
+    class Status(models.TextChoices):
+        PENDING = "pending", "Pending"
+        CONFIRMED = "confirmed", "Confirmed"
+        COMPLETED = "completed", "Completed"
+        CANCELLED = "cancelled", "Cancelled"
+
+    class Source(models.TextChoices):
+        LOCATOR = "locator", "Screening Locator"
+        AI_CHAT = "ai_chat", "AI Assistant"
+        GUEST_CHAT = "guest_chat", "Guest AI Chat"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    center = models.ForeignKey(ScreeningCenter, on_delete=models.CASCADE, related_name="bookings")
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="screening_bookings"
+    )
+    full_name = models.CharField(max_length=160)
+    phone = models.CharField(max_length=40)
+    preferred_date = models.DateField(null=True, blank=True)
+    service_name = models.CharField(max_length=160, blank=True, default="General Cancer Screening")
+    notes = models.TextField(blank=True)
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING)
+    source = models.CharField(max_length=20, choices=Source.choices, default=Source.LOCATOR)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.full_name} @ {self.center.name} ({self.status})"
 

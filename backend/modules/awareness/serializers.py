@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import AwarenessArticle, AwarenessCategory, GuidedChatNode, GuidedChatProgress
+from .models import AwarenessArticle, AwarenessCategory, GuidedChatNode, GuidedChatProgress, HealthReminder
 
 
 class AwarenessArticleSerializer(serializers.ModelSerializer):
@@ -46,4 +46,14 @@ class GuidedChatProgressSerializer(serializers.ModelSerializer):
             "visited_nodes", "completed", "updated_at",
         ]
         read_only_fields = ["id", "updated_at"]
+
+
+class HealthReminderSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = HealthReminder
+        fields = [
+            "id", "reminder_type", "title", "frequency", "next_due_date",
+            "channel", "phone", "is_active", "last_completed_at", "created_at",
+        ]
+        read_only_fields = ["id", "last_completed_at", "created_at"]
 

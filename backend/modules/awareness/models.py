@@ -100,3 +100,39 @@ class GuidedChatProgress(models.Model):
         unique_together = ("user", "cancer_type", "language")
         ordering = ["-updated_at"]
 
+
+class HealthReminder(models.Model):
+    class ReminderType(models.TextChoices):
+        BREAST_SELF_EXAM = "breast_self_exam", "Monthly Breast Self-Exam"
+        CERVICAL_SCREENING = "cervical_screening", "Cervical Cancer Screening"
+        HPV_FOLLOWUP = "hpv_followup", "HPV Vaccination / Follow-up"
+        CUSTOM = "custom", "Custom Reminder"
+
+    class Frequency(models.TextChoices):
+        MONTHLY = "monthly", "Monthly"
+        QUARTERLY = "quarterly", "Quarterly"
+        ANNUAL = "annual", "Annual"
+
+    class Channel(models.TextChoices):
+        IN_APP = "in_app", "In-App"
+        WHATSAPP = "whatsapp", "WhatsApp"
+        SMS = "sms", "SMS"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="health_reminders")
+    reminder_type = models.CharField(max_length=32, choices=ReminderType.choices, default=ReminderType.BREAST_SELF_EXAM)
+    title = models.CharField(max_length=160)
+    frequency = models.CharField(max_length=20, choices=Frequency.choices, default=Frequency.MONTHLY)
+    next_due_date = models.DateField()
+    channel = models.CharField(max_length=20, choices=Channel.choices, default=Channel.IN_APP)
+    phone = models.CharField(max_length=40, blank=True)
+    is_active = models.BooleanField(default=True)
+    last_completed_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["next_due_date", "-created_at"]
+
+    def __str__(self):
+        return f"{self.title} ({self.user.email} — due {self.next_due_date})"
+

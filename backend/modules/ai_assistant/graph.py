@@ -20,9 +20,55 @@ class ChatState(TypedDict, total=False):
     retrieved_chunks: list[dict[str, Any]]
     response: str
     sources: list[dict[str, Any]]
+    recommended_centers: list[dict[str, Any]]
 
 
 LUGANDA_HINTS = {"kookolo", "amabeere", "nnabaana", "okwekebeza", "obubonero", "omusawo", "eddagala", "bweereere", "bambi", "ntya"}
+
+SCREENING_INTENT_KEYWORDS = (
+    "screen", "clinic", "hospital", "center", "centre", "test", "pap", "via",
+    "mammogram", "checkup", "check up", "check-up", "where", "free", "book",
+    "appointment", "lump", "bleeding", "symptom", "doctor", "mulago", "kampala",
+    "mbarara", "gulu", "jinja", "kawempe", "wakiso", "okwekebeza", "ddwaliro",
+    "omusawo", "bweereere", "obubonero", "wa",
+)
+
+
+def _find_recommended_centers(user_message: str, is_urgent: bool = False) -> list[dict[str, Any]]:
+    """Return up to 2 verified Ugandan screening centers when the user asks about screening, locations, or symptoms."""
+    lowered = (user_message or "").lower()
+    if not is_urgent and not any(kw in lowered for kw in SCREENING_INTENT_KEYWORDS):
+        return []
+    try:
+        from modules.screening.models import ScreeningCenter
+
+        qs = ScreeningCenter.objects.filter(
+            status=ScreeningCenter.Status.ACTIVE, is_verified=True
+        ).prefetch_related("services")
+        centers = list(qs)
+        if not centers:
+            return []
+
+        # Prioritize centers whose district or name is mentioned in the user message
+        matched = [c for c in centers if c.district.lower() in lowered or c.name.lower() in lowered]
+        picked = matched[:2] if matched else centers[:2]
+        return [
+            {
+                "id": str(c.id),
+                "name": c.name,
+                "district": c.district,
+                "location": c.location,
+                "contact": c.contact,
+                "share_url": c.map_url or f"https://www.google.com/maps?q={c.latitude},{c.longitude}",
+                "services": [
+                    {"name": s.name, "price": float(s.price), "currency": s.currency}
+                    for s in c.services.filter(is_available=True)[:2]
+                ],
+            }
+            for c in picked
+        ]
+    except Exception:
+        return []
 
 
 def detect_language_node(state: ChatState) -> ChatState:
@@ -41,6 +87,7 @@ def safety_triage_node(state: ChatState) -> ChatState:
             "is_urgent": True,
             "response": urgent_escalation_message(state.get("language", "en")),
             "sources": [],
+            "recommended_centers": _find_recommended_centers(state.get("user_message", ""), is_urgent=True),
         }
     return {**state, "is_urgent": False}
 
@@ -126,7 +173,8 @@ def generate_response_node(state: ChatState) -> ChatState:
 
 def validate_safety_node(state: ChatState) -> ChatState:
     safe_text = ensure_safety_footer(state.get("response", ""), state.get("language", "en"))
-    return {**state, "response": safe_text}
+    centers = _find_recommended_centers(state.get("user_message", ""), is_urgent=bool(state.get("is_urgent")))
+    return {**state, "response": safe_text, "recommended_centers": centers}
 
 
 def _route_after_triage(state: ChatState) -> str:

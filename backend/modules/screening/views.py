@@ -7,8 +7,8 @@ from rest_framework.response import Response
 from core.concurrency import rw_lock
 from core.permissions import IsPlatformAdmin
 from core.services import log_audit
-from .models import ScreeningCenter
-from .serializers import ScreeningCenterSerializer
+from .models import ScreeningBooking, ScreeningCenter
+from .serializers import ScreeningBookingSerializer, ScreeningCenterSerializer
 
 
 def haversine_km(lat1, lng1, lat2, lng2):
@@ -89,4 +89,50 @@ class ScreeningCenterViewSet(viewsets.ModelViewSet):
                 results.append(center)
         results.sort(key=lambda c: c.distance_km)
         return Response(ScreeningCenterSerializer(results, many=True).data)
+
+
+class ScreeningBookingViewSet(viewsets.ModelViewSet):
+    """Screening appointment & callback bookings (supports guest + authenticated users; admin manages all)."""
+
+    serializer_class = ScreeningBookingSerializer
+    pagination_class = None
+
+    def get_permissions(self):
+        if self.action == "create":
+            return [permissions.AllowAny()]
+        if self.action in ("update", "partial_update", "destroy"):
+            return [IsPlatformAdmin()]
+        return [permissions.IsAuthenticated()]
+
+    def get_queryset(self):
+        qs = ScreeningBooking.objects.select_related("center", "user").all()
+        user = self.request.user
+        if not (user.is_authenticated and user.is_platform_admin):
+            qs = qs.filter(user=user)
+        status_f = self.request.query_params.get("status")
+        if status_f:
+            qs = qs.filter(status=status_f)
+        return qs
+
+    def perform_create(self, serializer):
+        user = self.request.user if self.request.user.is_authenticated else None
+        booking = serializer.save(user=user, status=ScreeningBooking.Status.PENDING)
+        if user:
+            log_audit(
+                self.request,
+                "screening.booking.create",
+                "ScreeningBooking",
+                booking.id,
+                {"center": booking.center.name, "source": booking.source},
+            )
+
+    def perform_update(self, serializer):
+        booking = serializer.save()
+        log_audit(
+            self.request,
+            "screening.booking.update",
+            "ScreeningBooking",
+            booking.id,
+            {"status": booking.status},
+        )
 

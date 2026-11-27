@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { CheckCircle2, XCircle, Award, X } from "lucide-react";
+import { CheckCircle2, XCircle, Award, X, Share2, Copy } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "../../api/client";
 import { ENDPOINTS } from "../../api/endpoints";
@@ -76,9 +76,39 @@ export default function QuizzesPage() {
               <div style={{ fontSize: 42, fontWeight: 900, color: "var(--text-primary)", margin: "4px 0" }}>
                 {result.attempt.percentage}%
               </div>
-              <p style={{ margin: 0, fontSize: 14, color: "var(--color-slate)" }}>
+              <p style={{ margin: "0 0 16px", fontSize: 14, color: "var(--color-slate)" }}>
                 You scored {result.attempt.score} out of {result.attempt.total_questions}
               </p>
+              <div className="row" style={{ justifyContent: "center", gap: 8 }}>
+                <a
+                  href={`https://wa.me/?text=${encodeURIComponent(
+                    lang === "lg"
+                      ? `Nfunye ${result.attempt.score}/${result.attempt.total_questions} (${result.attempt.percentage}%) mu kugezesebwa kwa ${activeQuiz.title} ku Wekebeze! Gezesa okumanya kwo era ofune ebifo by'okwekebeza kookolo mu Uganda: ${window.location.origin}`
+                      : `I scored ${result.attempt.score}/${result.attempt.total_questions} (${result.attempt.percentage}%) on "${activeQuiz.title}" on Wekebeze! Test your cancer awareness & find verified screening centers in Uganda: ${window.location.origin}`
+                  )}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="btn btn-teal btn-sm"
+                >
+                  <Share2 size={14} /> {lang === "lg" ? "Gabana ku WhatsApp" : "Share on WhatsApp"}
+                </a>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    const msg =
+                      lang === "lg"
+                        ? `Nfunye ${result.attempt.score}/${result.attempt.total_questions} (${result.attempt.percentage}%) ku Wekebeze! ${window.location.origin}`
+                        : `I scored ${result.attempt.score}/${result.attempt.total_questions} (${result.attempt.percentage}%) on Wekebeze! ${window.location.origin}`;
+                    if (navigator.clipboard) {
+                      navigator.clipboard.writeText(msg);
+                      toast.success(lang === "lg" ? "Obubaka bukopiddwa" : "Share text copied");
+                    }
+                  }}
+                >
+                  <Copy size={14} /> {lang === "lg" ? "Koppa" : "Copy"}
+                </Button>
+              </div>
             </Card>
 
             {(result.breakdown || []).map((item, idx) => (

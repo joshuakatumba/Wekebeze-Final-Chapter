@@ -1,7 +1,9 @@
+import csv
+from datetime import timedelta
 from django.contrib.auth import get_user_model
 from django.db import transaction
+from django.http import HttpResponse
 from django.utils import timezone
-from datetime import timedelta
 from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
@@ -9,12 +11,13 @@ from rest_framework.response import Response
 from core.concurrency import ConcurrencyBusyError, distributed_mutex
 from core.permissions import IsPlatformAdmin, has_role
 from core.services import log_audit
-from .models import AwarenessArticle, AwarenessCategory, GuidedChatNode, GuidedChatProgress, PublishStatus
+from .models import AwarenessArticle, AwarenessCategory, GuidedChatNode, GuidedChatProgress, HealthReminder, PublishStatus
 from .serializers import (
     AwarenessArticleSerializer,
     AwarenessCategorySerializer,
     GuidedChatNodeSerializer,
     GuidedChatProgressSerializer,
+    HealthReminderSerializer,
 )
 
 User = get_user_model()
@@ -207,8 +210,8 @@ def educator_stats_view(request):
 def platform_analytics_view(request):
     """Aggregated platform analytics for Administrators (never exposes private conversation content)."""
     from modules.quizzes.models import Quiz, QuizAttempt
-    from modules.screening.models import ScreeningCenter
-    from modules.ai_assistant.models import Conversation, KnowledgeDocument, Message
+    from modules.screening.models import ScreeningBooking, ScreeningCenter
+    from modules.ai_assistant.models import Conversation, KnowledgeDocument, LearningInsight, Message
 
     since_30d = timezone.now() - timedelta(days=30)
     return Response({
@@ -224,6 +227,7 @@ def platform_analytics_view(request):
             "articles": AwarenessArticle.objects.count(),
             "guided_nodes": GuidedChatNode.objects.count(),
             "guided_completions": GuidedChatProgress.objects.filter(completed=True).count(),
+            "active_reminders": HealthReminder.objects.filter(is_active=True).count(),
         },
         "quizzes": {
             "total_quizzes": Quiz.objects.count(),
@@ -232,12 +236,75 @@ def platform_analytics_view(request):
         "screening": {
             "total_centers": ScreeningCenter.objects.count(),
             "verified_centers": ScreeningCenter.objects.filter(is_verified=True).count(),
+            "total_bookings": ScreeningBooking.objects.count(),
+            "pending_bookings": ScreeningBooking.objects.filter(status=ScreeningBooking.Status.PENDING).count(),
         },
         "ai_assistant": {
             "total_conversations": Conversation.objects.count(),
             "total_messages": Message.objects.count(),
             "knowledge_documents": KnowledgeDocument.objects.count(),
             "approved_documents": KnowledgeDocument.objects.filter(review_status="approved").count(),
+            "open_insights": LearningInsight.objects.filter(status=LearningInsight.Status.PENDING).count(),
         },
     })
+
+
+class HealthReminderViewSet(viewsets.ModelViewSet):
+    """Personal monthly self-exam & annual screening reminders for authenticated users."""
+
+    serializer_class = HealthReminderSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    pagination_class = None
+
+    def get_queryset(self):
+        return HealthReminder.objects.filter(user=self.request.user)
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+
+    @action(detail=True, methods=["post"], url_path="complete")
+    def complete(self, request, pk=None):
+        """Mark reminder completed and automatically advance next_due_date."""
+        rem = self.get_object()
+        days = {"monthly": 30, "quarterly": 90, "annual": 365}.get(rem.frequency, 30)
+        base_date = max(rem.next_due_date, timezone.localdate())
+        rem.last_completed_at = timezone.now()
+        rem.next_due_date = base_date + timedelta(days=days)
+        rem.save(update_fields=["last_completed_at", "next_due_date"])
+        return Response(HealthReminderSerializer(rem).data)
+
+
+@api_view(["GET"])
+@permission_classes([IsPlatformAdmin])
+def platform_analytics_export_view(request):
+    """Downloadable anonymized Donor / Ministry of Health Impact Report (CSV)."""
+    from modules.quizzes.models import Quiz, QuizAttempt
+    from modules.screening.models import ScreeningBooking, ScreeningCenter
+    from modules.ai_assistant.models import Conversation, KnowledgeDocument, LearningInsight, Message
+
+    resp = HttpResponse(content_type="text/csv")
+    resp["Content-Disposition"] = f'attachment; filename="wekebeze-impact-report-{timezone.localdate().isoformat()}.csv"'
+    writer = csv.writer(resp)
+    writer.writerow(["Category", "Metric", "Value"])
+    rows = [
+        ("Users", "Total Registered Users", User.objects.count()),
+        ("Users", "Active Users", User.objects.filter(is_active=True).count()),
+        ("Users", "New Users (Last 30 Days)", User.objects.filter(date_joined__gte=timezone.now() - timedelta(days=30)).count()),
+        ("Awareness", "Published Articles", AwarenessArticle.objects.filter(status=PublishStatus.PUBLISHED).count()),
+        ("Awareness", "Guided Learning Completions", GuidedChatProgress.objects.filter(completed=True).count()),
+        ("Awareness", "Active Self-Exam / Screening Reminders", HealthReminder.objects.filter(is_active=True).count()),
+        ("Quizzes", "Total Quizzes", Quiz.objects.count()),
+        ("Quizzes", "Total Quiz Attempts", QuizAttempt.objects.count()),
+        ("Screening", "Verified Ugandan Centers", ScreeningCenter.objects.filter(is_verified=True).count()),
+        ("Screening", "Total Screening Bookings", ScreeningBooking.objects.count()),
+        ("Screening", "Pending Screening Bookings", ScreeningBooking.objects.filter(status=ScreeningBooking.Status.PENDING).count()),
+        ("Screening", "Completed Screenings", ScreeningBooking.objects.filter(status=ScreeningBooking.Status.COMPLETED).count()),
+        ("AI Assistant", "Total Conversations", Conversation.objects.count()),
+        ("AI Assistant", "Total Messages Exchanged", Message.objects.count()),
+        ("AI Assistant", "Approved Medical Knowledge Docs", KnowledgeDocument.objects.filter(review_status="approved").count()),
+        ("AI Assistant", "Open Community Knowledge Gaps", LearningInsight.objects.filter(status=LearningInsight.Status.PENDING).count()),
+    ]
+    for r in rows:
+        writer.writerow(r)
+    return resp
 

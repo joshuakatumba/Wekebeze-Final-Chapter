@@ -2,7 +2,7 @@ import re
 from django.db import transaction
 from rest_framework import serializers
 from core.concurrency import distributed_mutex
-from .models import CenterService, ScreeningCenter
+from .models import CenterService, ScreeningBooking, ScreeningCenter
 
 
 def _extract_coords_from_url(url: str):
@@ -76,4 +76,19 @@ class ScreeningCenterSerializer(serializers.ModelSerializer):
                     for s in services_data:
                         CenterService.objects.create(center=locked, **s)
                 return locked
+
+
+class ScreeningBookingSerializer(serializers.ModelSerializer):
+    center_name = serializers.CharField(source="center.name", read_only=True)
+    center_district = serializers.CharField(source="center.district", read_only=True)
+    center_contact = serializers.CharField(source="center.contact", read_only=True)
+
+    class Meta:
+        model = ScreeningBooking
+        fields = [
+            "id", "center", "center_name", "center_district", "center_contact",
+            "user", "full_name", "phone", "preferred_date", "service_name",
+            "notes", "status", "source", "created_at", "updated_at",
+        ]
+        read_only_fields = ["id", "user", "created_at", "updated_at"]
 
